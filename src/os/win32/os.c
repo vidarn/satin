@@ -256,7 +256,8 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	LARGE_INTEGER last_tick;
 	QueryPerformanceCounter(&last_tick);
 	QueryPerformanceFrequency(&counter_frequency);
-	long int drag_start_x, drag_start_y;
+	long int drag_start_x = 0;
+	long int drag_start_y = 0;
 	while (!done) {
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 			switch (msg.message) {
