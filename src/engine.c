@@ -248,7 +248,7 @@ void render_string_screen_n(const char *string, int n, int font, float *x,
     }
 }
 
-void render_string_screen(char *string, int font, float *x, float *y,
+void render_string_screen(const char *string, int font, float *x, float *y,
     struct Color color, struct RenderContext *context)
 {
     int len = (int)strlen(string);
