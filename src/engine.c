@@ -1,9 +1,11 @@
 #include "engine.h"
 #include "vn_gl.h"
 #define STB_IMAGE_IMPLEMENTATION
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
 #pragma clang diagnostic ignored "-Wextra"
+#endif
 #include "stb_image.h"
 #pragma clang diagnostic pop
 #define STB_RECT_PACK_IMPLEMENTATION
@@ -463,7 +465,7 @@ int create_render_texture(int w, int h, GLint format, struct GameData *data)
     */
 }
 
-static int compare_tinyobj_vert_index(void *a, void*b)
+static int compare_tinyobj_vert_index(void *a, void*b, void *data)
 {
     tinyobj_vertex_index_t *i1 = a;
     tinyobj_vertex_index_t *i2 = b;
@@ -509,7 +511,7 @@ int load_mesh(const char *name, int shader,
         tinyobj_vertex_index_t *faces = calloc(len,1);
         tinyobj_vertex_index_t *faces_tmp = calloc(len,1);
         int *idx = calloc(attrib.num_face_num_verts*3, sizeof(int));
-        for(int i=0;i<attrib.num_face_num_verts*3;i++){
+        for(unsigned int i=0;i<attrib.num_face_num_verts*3;i++){
             idx[i] = i;
         }
         int *idx_tmp = calloc(attrib.num_face_num_verts*3, sizeof(int));
@@ -517,7 +519,7 @@ int load_mesh(const char *name, int shader,
         merge_sort_custom_auxillary(faces, faces_tmp, sizeof(tinyobj_vertex_index_t), idx, idx_tmp, attrib.num_face_num_verts*3, compare_tinyobj_vert_index, 0);
         // Traverse and create a new unique vert each time some index changes
         int num_unique_verts = 1;
-        for(int i=1;i<attrib.num_face_num_verts*3;i++){
+        for(unsigned int i=1;i<attrib.num_face_num_verts*3;i++){
             tinyobj_vertex_index_t *t = faces + i;
             tinyobj_vertex_index_t *t_prev = t-1;
             if(t->v_idx != t_prev->v_idx || t->vn_idx != t_prev->vn_idx || t->vt_idx != t_prev->vt_idx){
@@ -535,7 +537,7 @@ int load_mesh(const char *name, int shader,
         float *vertex_data=calloc(vertex_data_len+normal_data_len+uv_map_data_len,1);
         float *normal_data = vertex_data + num_verts*3;
         float *uv_map_data = normal_data + num_verts*3;
-        int face_i = 0;
+        unsigned int face_i = 0;
         for(int i=0;i<num_verts;i++){
             tinyobj_vertex_index_t v = faces[face_i];
             vertex_data[i*3 + 0] = attrib.vertices[v.v_idx*3 + 0];
@@ -934,13 +936,13 @@ int load_font(const char *name, double font_size, struct GameData *data)
     struct Font *font = data->fonts+ret;
     data->num_fonts++;
 
-    font->height = font_size;
+    font->height = (float)font_size;
 
     const int first_char = 32;
     const int num_chars = 96;
     font->first_char = first_char;
     unsigned char *font_bitmap = calloc(font_bitmap_size*font_bitmap_size,1);
-    stbtt_BakeFontBitmap(font_data,0, font_size, font_bitmap, font_bitmap_size,
+    stbtt_BakeFontBitmap(font_data,0, (float)font_size, font_bitmap, font_bitmap_size,
         font_bitmap_size, first_char, num_chars, font->baked_chars+first_char);
     free(font_data);
     unsigned char *font_rgba = calloc(font_bitmap_size*font_bitmap_size,4);
@@ -1292,7 +1294,6 @@ float sum_values(float *values, int num)
 struct GameData *init(int num_game_states, struct GameState *game_states, void *param)
 {
     struct GameData *data = calloc(1,sizeof(struct GameData));
-	char error_buffer[ERROR_BUFFER_LEN];
     data->sprite_shader = load_shader("sprite", "sprite", data, "pos", "uv",(char*)0);
 
     data->line_shader = load_shader("line", "line" , data, "pos", (char*)0);

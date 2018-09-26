@@ -8,21 +8,46 @@
 
 FILE *open_file(const char *filename,const char *extension,const char *mode)
 {
+#define _SATIN_OPEN_FILE_MAX_PATH_LEN PATHCCH_MAX_CCH
     HMODULE hModule=GetModuleHandleA(NULL);
-    WCHAR path_w[MAX_PATH];
+    WCHAR path_w[_SATIN_OPEN_FILE_MAX_PATH_LEN];
     GetModuleFileNameW(hModule,path_w,MAX_PATH);
     PathCchRemoveFileSpec(path_w,MAX_PATH);
-    /*
-    char path[MAX_PATH];
-    wcstombs(path,path_w,MAX_PATH);
-    */
+	PathCchAppendEx(path_w, _SATIN_OPEN_FILE_MAX_PATH_LEN, L"\\data\\", PATHCCH_ALLOW_LONG_PATHS);
+
+	size_t path_len = wcslen(path_w);
+	size_t filename_len = 0;
+	mbstowcs_s(&filename_len, path_w + path_len,
+		(_SATIN_OPEN_FILE_MAX_PATH_LEN - path_len) * sizeof(wchar_t),
+		filename, _TRUNCATE);
+	size_t ext_len = 0;
+	mbstowcs_s(&ext_len, path_w + path_len + filename_len-1,
+		(_SATIN_OPEN_FILE_MAX_PATH_LEN - path_len - filename_len+1) * sizeof(wchar_t),
+		extension, _TRUNCATE);
+
+	wchar_t mode_w[32];
+	size_t mode_len = 0;
+	mbstowcs_s(&mode_len, mode_w, sizeof(mode_w), mode, _TRUNCATE);
+
+	/*
+	OutputDebugStringW(L"path_w: ");
+	OutputDebugStringW(path_w);
+	OutputDebugStringW(L"\n");
+	*/
+
+	FILE *fp = 0;
+	_wfopen_s(&fp, path_w, mode_w);
+
+	/*
     char *path="C:\\Users\\vidnel\\Documents\\projects\\masters_thesis\\code";
     char *buffer=(char*)calloc(strlen(filename)+strlen(extension)+strlen(path)+32,1);
     sprintf(buffer,"%s\\data\\%s%s",path,filename,extension);
     printf("loading file %s\n",buffer);
     FILE *fp = fopen(buffer,mode);
     free(buffer);
+	*/
     return fp;
+#undef _SATIN_OPEN_FILE_MAX_PATH_LEN
 }
 
 char *get_save_file_name(const char *title)
@@ -110,7 +135,7 @@ WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 static HWND
-CreateOpenGLWindow(char* title, int x, int y, int width, int height,
+CreateOpenGLWindow(const char* title, int x, int y, int width, int height,
 	BYTE type, DWORD flags)
 {
 	int         pf;
@@ -220,7 +245,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 		OutputDebugStringA("Error: \n");
 		MessageBoxA(NULL, "GLEW error"
 			"Could not initialize", "Error", MB_OK);
-		return 0;
+		return;
 	}
 
 	int attribs[] =
@@ -323,9 +348,9 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				d_y = 1.f - (drag_y / w - 0.5*(h - w) / w);
 			}
 			else {
-				m_x = p_x / h - 0.5*(w - h) / h;
+				m_x = p_x / h - 0.5f*(w - h) / h;
 				m_y = 1.f - p_y / h;
-				d_x = drag_x / h - 0.5*(w - h) / h;
+				d_x = drag_x / h - 0.5f*(w - h) / h;
 				d_y = 1.f - drag_y / h;
 			}
 			input_state.delta_x = m_x - input_state.mouse_x;
@@ -389,6 +414,4 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	ReleaseDC(hWnd, hDC);
 	wglDeleteContext(hRC);
 	DestroyWindow(hWnd);
-
-	return msg.wParam;
 }
