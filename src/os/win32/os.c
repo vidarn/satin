@@ -18,16 +18,16 @@ FILE *open_file(const char *filename,const char *extension,const char *mode)
 	size_t path_len = wcslen(path_w);
 	size_t filename_len = 0;
 	mbstowcs_s(&filename_len, path_w + path_len,
-		(_SATIN_OPEN_FILE_MAX_PATH_LEN - path_len) * sizeof(wchar_t),
+		(_SATIN_OPEN_FILE_MAX_PATH_LEN - path_len),
 		filename, _TRUNCATE);
 	size_t ext_len = 0;
 	mbstowcs_s(&ext_len, path_w + path_len + filename_len-1,
-		(_SATIN_OPEN_FILE_MAX_PATH_LEN - path_len - filename_len+1) * sizeof(wchar_t),
+		(_SATIN_OPEN_FILE_MAX_PATH_LEN - path_len - filename_len+1),
 		extension, _TRUNCATE);
 
 	wchar_t mode_w[32];
 	size_t mode_len = 0;
-	mbstowcs_s(&mode_len, mode_w, sizeof(mode_w), mode, _TRUNCATE);
+	mbstowcs_s(&mode_len, mode_w, sizeof(mode_w)/sizeof(wchar_t), mode, _TRUNCATE);
 
 	/*
 	OutputDebugStringW(L"path_w: ");

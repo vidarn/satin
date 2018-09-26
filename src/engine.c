@@ -5,9 +5,11 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
 #pragma clang diagnostic ignored "-Wextra"
-#endif
 #include "stb_image.h"
 #pragma clang diagnostic pop
+#else
+#include "stb_image.h"
+#endif
 #define STB_RECT_PACK_IMPLEMENTATION
 #include "stb_rect_pack.h"
 #define STB_TRUETYPE_IMPLEMENTATION
