@@ -177,6 +177,7 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
 int load_sprite(const char *name, struct GameData *data);
 int load_mesh(const char *name, int shader,
     struct GameData *data);
+int load_mesh_unit_plane(int shader, struct GameData *data);
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, struct Vec2 *uv_data, int num_faces,
     int *face_data, int shader, struct GameData *data);

@@ -651,6 +651,33 @@ int load_mesh(const char *name, int shader,
     return -1;
 }
 
+int load_mesh_unit_plane(int shader, struct GameData *data)
+{
+	struct Vec3 pos_data[] = {
+		{0.f, 0.f, 0.f},
+		{1.f, 0.f, 0.f},
+		{0.f, 1.f, 0.f},
+		{1.f, 1.f, 0.f},
+	};
+	struct Vec3 nor_data[] = {
+		{0.f, 0.f, 1.f},
+		{0.f, 0.f, 1.f},
+		{0.f, 0.f, 1.f},
+		{0.f, 0.f, 1.f},
+	};
+	struct Vec2 uv_data[] = {
+		{0.f, 0.f},
+		{1.f, 0.f},
+		{0.f, 1.f},
+		{1.f, 1.f},
+	};
+	int tri_data[] = {
+		0, 1, 2,
+		3, 2, 1,
+	};
+	return load_mesh_from_memory(4, pos_data, nor_data, uv_data, 2, tri_data, shader, data);
+}
+
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
                           struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
                           int *tri_data, int shader, struct GameData *data)
