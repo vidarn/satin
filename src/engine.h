@@ -181,6 +181,7 @@ int load_mesh_unit_plane(int shader, struct GameData *data);
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, struct Vec2 *uv_data, int num_faces,
     int *face_data, int shader, struct GameData *data);
+void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data);
 void calculate_mesh_normals(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, int num_tris, int *tri_data);
 void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,

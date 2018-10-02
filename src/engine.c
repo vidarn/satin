@@ -745,6 +745,30 @@ int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     return mesh_index;
 }
 
+void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data)
+{
+	//TODO(Vidar):Only supports OBJ for now
+	FILE *fp = open_file(name, ext, "wt");
+	if (fp) {
+		struct Mesh m = data->meshes[mesh];
+		int num_verts = m.num_verts;
+		struct Vec3 *pos_data = calloc(num_verts, sizeof(struct Vec3));
+		get_mesh_vert_data(mesh, pos_data, 0, 0, data);
+		for (int i = 0; i < num_verts; i++) {
+			struct Vec3 p = pos_data[i];
+			fprintf(fp, "v %f %f %f\n", p.x, p.y, p.z);
+		}
+		int num_tris = m.num_tris;
+		int *tri_data = calloc(num_tris, 3 * sizeof(float));
+		get_mesh_tri_data(mesh, tri_data, data);
+		for (int i = 0; i < num_tris; i++) {
+			fprintf(fp, "f %d %d %d\n", tri_data[i * 3 + 0]+1,
+				tri_data[i * 3 + 1]+1, tri_data[i * 3 + 2]+1);
+		}
+		fclose(fp);
+	}
+}
+
 void calculate_mesh_normals(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, int num_tris, int *tri_data)
 {
@@ -1233,7 +1257,9 @@ int get_active_game_state(struct GameData *data)
 
 void set_custom_data_pointer(void * custom_data, struct GameData *data)
 {
-    data->game_states[data->active_game_state].custom_data = custom_data;
+	if (data->active_game_state >= 0) {
+		data->game_states[data->active_game_state].custom_data = custom_data;
+	}
 }
 
 void *get_custom_data_pointer(struct GameData *data)
@@ -1328,7 +1354,8 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     data->line_shader = load_shader("line", "line" , data, "pos", (char*)0);
 
     data->num_game_state_types = num_game_states;
-    data->game_state_types = game_states;
+    data->game_state_types = calloc(num_game_states,sizeof(struct GameState));
+	memcpy(data->game_state_types, game_states, num_game_states * sizeof(struct GameState));
     
     
 	glGenVertexArrays(1,&data->sprite_vertex_array);
@@ -1398,19 +1425,20 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     glEnableVertexAttribArray(0); //"pos" is always at loc 0
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
 
-    /*
-    for(int i=0;i<data->num_game_states;i++){
-        printf("init game state %d\n", i);
-        data->active_game_state = i;
-        data->game_states[i].init(data);
-    }
-    */
     
     data->active_game_state = 0;
     data->game_states = calloc(1, sizeof(struct GameState));
     data->num_game_states = 1;
     data->game_states[0] = data->game_state_types[0];
     data->game_states[0].init(data,param,-1);
+
+    data->active_game_state = -1;
+    for(int i=1;i<data->num_game_state_types;i++){
+		struct GameState tmp_game_state = data->game_state_types[i];
+        tmp_game_state.init(data,0,-1);
+		tmp_game_state.destroy(data);
+    }
+    data->active_game_state = 0;
 
     create_sprite_atlas(data);
 

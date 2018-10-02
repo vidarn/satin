@@ -10,6 +10,7 @@ char *get_open_file_name(const char *title);
 uint64_t get_current_tick(void);
 size_t get_file_len(FILE *fp);
 int get_num_cores(void);
+const char *get_computer_name(void);
 
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console,
 	int num_game_states, void *param, struct GameState *game_states);

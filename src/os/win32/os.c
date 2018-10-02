@@ -67,6 +67,16 @@ uint64_t get_current_tick(void)
     return (int)current_tick.QuadPart;
 }
 
+const char *get_computer_name(void)
+{
+	static char buffer[MAX_COMPUTERNAME_LENGTH + 2] = {0};
+	int len = sizeof(buffer);
+	if (buffer[0] == 0) {
+		GetComputerNameA(buffer, &len);
+	}
+	return buffer;
+}
+
 #include "GL/glew.h"
 #include "GL/wglew.h"
 #include <stdio.h>
@@ -144,6 +154,8 @@ CreateOpenGLWindow(const char* title, int x, int y, int width, int height,
 	WNDCLASSA    wc;
 	PIXELFORMATDESCRIPTOR pfd;
 	static HINSTANCE hInstance = 0;
+
+	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
 	/* only register the window class once - use hInstance as a flag. */
 	if (!hInstance) {
