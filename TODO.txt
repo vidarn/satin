@@ -1,0 +1,4 @@
+Better resource handling
+* Support loading resources at runtime (rebuild sprite sheets etc)
+* Remember loaded files and deliver them directly
+* Add a separate phase for loading the resources needed for a state
