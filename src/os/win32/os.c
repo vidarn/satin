@@ -295,6 +295,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	QueryPerformanceFrequency(&counter_frequency);
 	long int drag_start_x = 0;
 	long int drag_start_y = 0;
+	int cursor_visible = 1;
 	while (!done) {
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 			switch (msg.message) {
@@ -367,6 +368,26 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			}
 			input_state.delta_x = m_x - input_state.mouse_x;
 			input_state.delta_y = m_y - input_state.mouse_y;
+			if (cursor_locked(game_data)) {
+				m_x -= input_state.delta_x;
+				m_y -= input_state.delta_y;
+				d_x -= input_state.delta_x;
+				d_y -= input_state.delta_y;
+
+				POINT tmp_p = { drag_start_x, drag_start_y };
+				ClientToScreen(hWnd, &tmp_p);
+				if (cursor_visible) {
+					while (ShowCursor(FALSE) >= 0) {}
+				}
+				cursor_visible = 0;
+				SetCursorPos(tmp_p.x, tmp_p.y);
+			}
+			else {
+				if (!cursor_visible) {
+					while (ShowCursor(TRUE) < 0) {}
+				}
+				cursor_visible = 1;
+			}
 			input_state.mouse_x = m_x;
 			input_state.mouse_y = m_y;
 			input_state.drag_start_x = d_x;

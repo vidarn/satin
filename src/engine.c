@@ -105,6 +105,7 @@ struct GameData{
     void *common_data;
     float window_min_x, window_max_x;
     float window_min_y, window_max_y;
+	int lock_cursor;
 };
 
 int hero_sprite;
@@ -1311,6 +1312,21 @@ struct Vec3 untransform_vec3(struct Vec3 p, struct Vec3 x_axis,
     ret.y = x_axis.y*p.x + y_axis.y*p.y + z_axis.y*p.z;
     ret.z = x_axis.z*p.x + y_axis.z*p.y + z_axis.z*p.z;
     return ret;
+}
+
+int cursor_locked(struct GameData *data)
+{
+	return data->lock_cursor;
+}
+
+void lock_cursor(struct GameData *data)
+{
+	data->lock_cursor = 1;
+}
+
+void unlock_cursor(struct GameData *data)
+{
+	data->lock_cursor = 0;
 }
 
 float sum_values(float *values, int num)

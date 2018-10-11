@@ -221,6 +221,9 @@ struct Vec3 transform_vec3(struct Vec3 p, struct Vec3 x_axis, struct Vec3 y_axis
 struct Vec3 untransform_vec3(struct Vec3 p, struct Vec3 x_axis, struct Vec3 y_axis,
     struct Vec3 z_axis);
 
+int cursor_locked(struct GameData *data);
+void lock_cursor(struct GameData *data);
+void unlock_cursor(struct GameData *data);
 
 float sum_values(float *values, int num);
 
