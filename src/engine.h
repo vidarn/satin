@@ -225,6 +225,8 @@ int cursor_locked(struct GameData *data);
 void lock_cursor(struct GameData *data);
 void unlock_cursor(struct GameData *data);
 
+int was_key_typed(int key, struct InputState *input_state);
+
 float sum_values(float *values, int num);
 
 //Input

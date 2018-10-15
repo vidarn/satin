@@ -1,5 +1,6 @@
 #pragma once
 #define     KEY_ESCAPE   0x1B
+#define     KEY_SPACE   0x20
 #define     KEY_LEFT   0x25
 #define     KEY_UP   0x26
 #define     KEY_RIGHT   0x27
