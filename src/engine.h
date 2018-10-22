@@ -114,9 +114,11 @@ struct Matrix4 get_aspect_correction_matrix4(float w,float h);
 struct Matrix4 get_perspective_matrix4(float fov,float n,float f);
 struct Matrix4 get_orthographic_matrix4(float scale,float n,float f);
 struct Matrix4 get_translation_matrix4(float x,float y,float z);
+struct Matrix4 get_rotation_matrix4(float x, float y, float z);
 struct Matrix4 get_scale_matrix4(float s);
 struct Matrix4 get_identity_matrix4(void);
 struct Matrix4 transpose_matrix4(struct Matrix4);
+struct Matrix4 invert_matrix4_noscale(struct Matrix4 mat);
 struct Matrix4 lu_decompose_matrix4(struct Matrix4 mat);
 struct Vec4 solve_LU_matrix4_vec4(struct Matrix4 lu, struct Vec4 y);
 void print_matrix4(struct Matrix4);
@@ -226,6 +228,7 @@ void lock_cursor(struct GameData *data);
 void unlock_cursor(struct GameData *data);
 
 int was_key_typed(int key, struct InputState *input_state);
+int is_key_down(int key);
 
 float sum_values(float *values, int num);
 

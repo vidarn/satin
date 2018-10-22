@@ -1339,6 +1339,10 @@ int was_key_typed(int key, struct InputState *input_state)
 	return 0;
 }
 
+int is_key_down(int key) {
+	return os_is_key_down(key);
+}
+
 float sum_values(float *values, int num)
 {
     float naive_sum = 0.f;
@@ -1925,6 +1929,39 @@ struct Matrix4 get_translation_matrix4(float x,float y,float z)
     return ret;
 }
 
+struct Matrix4 get_rotation_matrix4(float x,float y,float z)
+{
+    float cx = cosf(x);
+    float sx = sinf(x);
+    float cy = cosf(y);
+    float sy = sinf(y);
+    float cz = cosf(z);
+    float sz = sinf(z);
+    struct Matrix4 rot_x =
+    {
+        1.f,0.f,0.f, 0.f,
+        0.f, cx,-sx, 0.f,
+        0.f, sx, cx, 0.f,
+		0.f, 0.f, 0.f, 1.f
+    };
+    struct Matrix4 rot_y =
+    {
+        cy,0.f, sy, 0.f,
+        0.f,1.f,0.f, 0.f,
+        -sy,0.f, cy, 0.f,
+		0.f, 0.f, 0.f, 1.f
+    };
+    struct Matrix4 rot_z =
+    {
+        cz,-sz,0.f, 0.f,
+        sz, cz,0.f, 0.f,
+        0.f,0.f,1.f, 0.f,
+		0.f, 0.f, 0.f, 1.f
+    };
+    struct Matrix4 tmp = multiply_matrix4(rot_x, rot_y);
+    return multiply_matrix4(tmp, rot_z);
+}
+
 struct Matrix4 get_scale_matrix4(float s)
 {
     struct Matrix4 ret;
@@ -1962,6 +1999,27 @@ struct Matrix4 transpose_matrix4(struct Matrix4 m)
         M4(m,0,3), M4(m,1,3), M4(m,2,3), M4(m,3,3),
     };
     return ret;
+}
+
+struct Matrix4 invert_matrix4_noscale(struct Matrix4 m)
+{
+	//NOTE(Vidar): Transpose the rotation and negate the translation
+    struct Matrix3 rot = {
+         M4(m,0,0), M4(m,0,1), M4(m,0,2),
+         M4(m,1,0), M4(m,1,1), M4(m,1,2),
+         M4(m,2,0), M4(m,2,1), M4(m,2,2),
+    };
+	struct Vec3 trans = {
+		 -M4(m,3,0), -M4(m,3,1), -M4(m,3,2)
+	};
+	trans = multiply_matrix3_vec3(rot, trans);
+    struct Matrix4 ret = {
+        M3(rot,0,0), M3(rot,1,0), M3(rot,2,0), 0.f,
+        M3(rot,0,1), M3(rot,1,1), M3(rot,2,1), 0.f,
+        M3(rot,0,2), M3(rot,1,2), M3(rot,2,2), 0.f,
+		trans.x,     trans.y,     trans.z,     1.f
+    };
+	return ret;
 }
 
 //https://www.gamedev.net/resources/_/technical/math-and-physics/matrix-inversion-using-lu-decomposition-r3637

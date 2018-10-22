@@ -17,4 +17,18 @@
 #define     KEY_F10 0x79
 #define     KEY_F11 0x7a
 #define     KEY_F12 0x7b
+#define		KEY_NUMPAD0 0x60
+#define		KEY_NUMPAD1 0x61
+#define		KEY_NUMPAD2 0x62
+#define		KEY_NUMPAD3 0x63
+#define		KEY_NUMPAD4 0x64
+#define		KEY_NUMPAD5 0x65
+#define		KEY_NUMPAD6 0x66
+#define		KEY_NUMPAD7 0x67
+#define		KEY_NUMPAD8 0x68
+#define		KEY_NUMPAD9 0x69
+#define		KEY_NUMPAD_PLUS 0x6B
+#define		KEY_NUMPAD_MINUS 0x6D
+#define		KEY_NUMPAD_DIVIDE 0x6F
+#define		KEY_NUMPAD_MULTIPLY 0x6A
 

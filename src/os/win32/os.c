@@ -77,6 +77,10 @@ const char *get_computer_name(void)
 	return buffer;
 }
 
+int os_is_key_down(int key) {
+	return GetKeyState(key) < 0;
+}
+
 #include "GL/glew.h"
 #include "GL/wglew.h"
 #include <stdio.h>
