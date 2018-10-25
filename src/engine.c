@@ -1329,7 +1329,7 @@ void unlock_cursor(struct GameData *data)
 	data->lock_cursor = 0;
 }
 
-int was_key_typed(int key, struct InputState *input_state)
+int was_key_typed(unsigned int key, struct InputState *input_state)
 {
 	for (int i = 0; i < input_state->num_keys_typed; i++) {
 		if (input_state->keys_typed[i] == key) {

@@ -281,7 +281,7 @@ struct InputState
     int mouse_state, mouse_state_middle, mouse_state_right;
     int mouse_down, mouse_down_middle, mouse_down_right;
     int num_keys_typed;
-    int keys_typed[max_num_keys_typed];
+    unsigned int keys_typed[max_num_keys_typed];
 	struct ControllerState controllers[max_num_controllers];
 };
 

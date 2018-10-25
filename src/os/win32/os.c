@@ -6,6 +6,7 @@
 #include <Pathcch.h>
 #pragma comment(lib, "Pathcch.lib") 
 
+
 FILE *open_file(const char *filename,const char *extension,const char *mode)
 {
 #define _SATIN_OPEN_FILE_MAX_PATH_LEN PATHCCH_MAX_CCH
@@ -308,13 +309,15 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				break;
 			case WM_CHAR:
 			{
+				/*
 				OutputDebugStringA("Key input: ");
 				char c[2] = { 0 };
 				c[0] = (char)msg.wParam;
 				OutputDebugStringA(c);
 				OutputDebugStringA("\n");
+				*/
 				if (input_state.num_keys_typed<max_num_keys_typed) {
-					input_state.keys_typed[input_state.num_keys_typed] = (char)msg.wParam;
+					input_state.keys_typed[input_state.num_keys_typed] = msg.wParam;
 					input_state.num_keys_typed++;
 				}
 				break;

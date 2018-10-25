@@ -1,4 +1,8 @@
 #pragma once
+#define     KEY_BACKSPACE   0x08
+#define     KEY_DELETE   0x2E
+#define     KEY_TAB   0x09
+#define     KEY_RETURN   0x0D
 #define     KEY_ESCAPE   0x1B
 #define     KEY_SPACE   0x20
 #define     KEY_LEFT   0x25
