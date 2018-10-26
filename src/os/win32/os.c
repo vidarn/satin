@@ -87,6 +87,10 @@ int os_is_key_down(int key) {
 #include <stdio.h>
 #include <math.h>
 
+int atomic_increment_int32(int *a) {
+	return InterlockedIncrement(a);
+}
+
 
 struct InputState input_state = { 0 };
 int framebuffer_w = 0;
