@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 2.6)
-set(VLIB_INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/vlib CACHE PATH "vlib include directory")
-set(VLIB_SRC ${VLIB_INC_DIR}/sort/sort.c)
-include_directories(${VLIB_INC_DIR})
 
+set(VLIB_SRC
+	${VLIB_INC_DIR}/sort/sort.c
+)
 project(satin)
+include_directories(${VLIB_INC_DIR})
 
 set(SATIN_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(SATIN_SRC
@@ -13,6 +14,8 @@ set(SATIN_SRC
 include_directories(${SATIN_SRC_DIR})
 
 add_library(satin ${SATIN_SRC} ${VLIB_SRC})
+
+target_compile_options(satin PRIVATE /arch:AVX2)
 
 find_package(GLEW REQUIRED)
 find_package(OpenGL 3.2 REQUIRED)

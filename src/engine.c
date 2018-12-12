@@ -24,11 +24,22 @@
 #include <immintrin.h>
 
 static const int uniform_sizes[] = {
-#define SHADER_UNIFORM_TYPE(name,size) size,
+#define SHADER_UNIFORM_TYPE(name,num,size,gl_type) num*size,
     SHADER_UNIFORM_TYPES
 #undef SHADER_UNIFORM_TYPE
 };
 
+static const int uniform_gl_types[] = {
+#define SHADER_UNIFORM_TYPE(name,num,size,gl_type) gl_type,
+    SHADER_UNIFORM_TYPES
+#undef SHADER_UNIFORM_TYPE
+};
+
+static const int uniform_nums[] = {
+#define SHADER_UNIFORM_TYPE(name,num,size,gl_type) num,
+    SHADER_UNIFORM_TYPES
+#undef SHADER_UNIFORM_TYPE
+};
 
 struct SpriteData{
     int loaded;
@@ -143,7 +154,7 @@ void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
     }
     struct RenderQuad * r = list->quads + list->num;
     list->num++;
-    memcpy(r->m,&m,9*sizeof(float));
+	*(struct Matrix3*)&r->m = multiply_matrix3(m, context->camera_2d);
     r->num_uniforms = num_uniforms;
     r->uniforms = calloc(num_uniforms*sizeof(struct ShaderUniform),1);
     r->shader = shader;
@@ -358,11 +369,13 @@ void render_string_screen_fancy(const char *string, int font_id, float *x, float
 void render_line_screen(float x1, float y1, float x2, float y2, float thickness,
                         struct Color color, struct RenderContext *context)
 {
+	float scale_x = context->camera_2d.m[0];
+	float scale_y = context->camera_2d.m[4];
     float dx1 = (x2-x1);
     float dy1 = (y2-y1);
     float mag = sqrtf(dx1*dx1 + dy1*dy1);
-    float dx2 = -dy1/mag*thickness;
-    float dy2 =  dx1/mag*thickness;
+    float dx2 = -dy1/mag*thickness/scale_x;
+    float dy2 =  dx1/mag*thickness/scale_y;
     struct Matrix3 m= {
         dx1, dy1, 0.f,
         dx2, dy2, 0.f,
@@ -388,6 +401,7 @@ void render_mesh(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
     int num_uniforms, struct RenderContext *context)
 {
     struct RenderMesh render_mesh = {0};
+	render_mesh.depth_test = !context->disable_depth_test;
     render_mesh.mesh = mesh;
     *(struct Matrix4*)&render_mesh.m = mat;
     *(struct Matrix4*)&render_mesh.cam = context->camera_3d;
@@ -746,6 +760,64 @@ int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     return mesh_index;
 }
 
+int load_custom_mesh_from_memory(int num_verts, int num_tris,
+    int *tri_data, int shader, struct GameData *data, int num_data_specs, struct CustomMeshDataSpec *data_spec)
+{
+	int total_data_len = 0;
+	for (int i = 0; i < num_data_specs; i++) {
+		struct CustomMeshDataSpec spec = data_spec[i];
+		total_data_len += uniform_sizes[spec.type]*num_verts;
+	}
+    float *vertex_data=calloc(total_data_len,1);
+	unsigned char *vd = vertex_data;
+	for (int i = 0; i < num_data_specs; i++) {
+		struct CustomMeshDataSpec spec = data_spec[i];
+		int data_len = uniform_sizes[spec.type]*num_verts;
+		memcpy(vd, spec.data, data_len);
+		vd += data_len;
+	}
+
+    struct Mesh mesh;
+    mesh.shader=&(data->shaders[shader]);
+    glGenVertexArrays(1,&mesh.vertex_array);
+    glBindVertexArray(mesh.vertex_array);
+    glGenBuffers(1,&mesh.vertex_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER,mesh.vertex_buffer);
+    
+    mesh.num_verts = num_verts;
+    
+    glBufferData(GL_ARRAY_BUFFER,total_data_len,vertex_data,
+                 GL_STATIC_DRAW);
+    //TODO(Vidar):We should be able to free it now, right?
+    //free(vertex_data);
+	int offset = 0;
+	for (int i = 0; i < num_data_specs; i++) {
+		struct CustomMeshDataSpec spec = data_spec[i];
+		int loc=glGetAttribLocation(mesh.shader->shader,spec.name);
+		if(loc == -1){
+			printf("Error: Could not find \"%s\" attribute in shader\n", spec.name);
+		}
+		glEnableVertexAttribArray(loc);
+		glVertexAttribPointer(loc,uniform_nums[spec.type],uniform_gl_types[spec.type],GL_FALSE,
+			0, (void*)(intptr_t)(offset));
+		offset += uniform_sizes[spec.type]*num_verts;
+	}
+    
+    mesh.num_tris = num_tris;
+    int index_data_len = mesh.num_tris*3*sizeof(int);
+
+    glGenBuffers(1,&mesh.index_buffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.index_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,tri_data,
+                 GL_STATIC_DRAW);
+    
+    int mesh_index = data->num_meshes;
+    data->meshes = realloc(data->meshes,(++data->num_meshes)
+                           *sizeof(struct Mesh));
+    data->meshes[mesh_index] = mesh;
+    return mesh_index;
+}
+
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data)
 {
 	//TODO(Vidar):Only supports OBJ for now
@@ -819,6 +891,20 @@ void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
     }
     glUnmapBuffer(GL_ARRAY_BUFFER);
 }
+void update_custom_mesh_verts_from_memory(int mesh, int num_data_specs, struct CustomMeshDataSpec *data_spec,
+	struct GameData *data)
+{
+    struct Mesh m = data->meshes[mesh];
+    glBindBuffer(GL_ARRAY_BUFFER, m.vertex_buffer);
+    unsigned char *buffer = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	for (int i = 0; i < num_data_specs; i++) {
+		struct CustomMeshDataSpec spec = data_spec[i];
+		int data_len = uniform_sizes[spec.type]*m.num_verts;
+		memcpy(buffer, spec.data, data_len);
+		buffer += data_len;
+	}
+    glUnmapBuffer(GL_ARRAY_BUFFER);
+}
 
 int get_mesh_num_verts(int mesh, struct GameData *data)
 {
@@ -873,6 +959,22 @@ int load_shader(const char* vert_filename, const char * frag_filename,
         frag_filename, error_buffer, ERROR_BUFFER_LEN, "#version 330\n",
         args);
     va_end(args);
+    if(error_buffer[0] != 0){
+        printf("Shader compilation error:\n%s\n",error_buffer);
+    }
+    data->num_shaders++;
+    data->shaders = realloc(data->shaders,data->num_shaders*sizeof(struct Shader));
+    data->shaders[data->num_shaders-1] = shader;
+    return data->num_shaders - 1;
+}
+
+int load_shader_from_string(const char* vert_source, const char * frag_source,
+    struct GameData *data)
+{
+    char error_buffer[ERROR_BUFFER_LEN] = {0};
+	struct Shader shader = { 0 };
+	shader.shader = compile_shader(vert_source,
+        frag_source, error_buffer, ERROR_BUFFER_LEN, "#version 330\n");
     if(error_buffer[0] != 0){
         printf("Shader compilation error:\n%s\n",error_buffer);
     }
@@ -1508,6 +1610,9 @@ struct Color rgba(float r, float g, float b, float a)
     return ret;
 }
 
+struct Color color_white = { 1.f,1.f,1.f,1.f };
+struct Color color_black = { 0.f,0.f,0.f,1.f };
+
 struct Matrix3 multiply_matrix3(struct Matrix3 A, struct Matrix3 B)
 {
     if((0)){
@@ -1620,6 +1725,68 @@ struct Matrix3 lu_decompose_matrix3(struct Matrix3 A)
         }
     }
     return ret;
+}
+
+struct Matrix3 get_translation_matrix3(float x, float y)
+{
+    struct Matrix3 ret;
+    float m[8]=
+    {
+        1.f, 0.f,0.f,
+        0.f, 1.f, 0.f,
+        0.f, 0.f
+    };
+    memcpy(ret.m,m,8*sizeof(float));
+	//ret = *(struct Matrix3*)m;
+	ret.m[6] = x;
+	ret.m[7] = y;
+	ret.m[8] = 1.f;
+    return ret;
+}
+
+struct Matrix3 get_scale_matrix3(float s)
+{
+
+    struct Matrix3 ret;
+    float m[4]=
+    {
+        s,0.f,0.f, 0.f
+    };
+    memcpy(ret.m,m,4*sizeof(float));
+    memcpy(ret.m+4,m,4*sizeof(float));
+	ret.m[8] = 1.f;
+	return ret;
+}
+
+struct Matrix3 get_scale_matrix3_non_uniform(float sx, float sy)
+{
+    struct Matrix3 ret;
+    float mx[4]=
+    {
+        sx,0.f,0.f, 0.f
+    };
+    float my[4]=
+    {
+        sy,0.f,0.f, 0.f
+    };
+    memcpy(ret.m,mx,4*sizeof(float));
+    memcpy(ret.m+4,my,4*sizeof(float));
+	ret.m[8] = 1.f;
+	return ret;
+}
+
+struct Matrix3 get_identity_matrix3(void)
+{
+    struct Matrix3 ret;
+    float m[8]=
+    {
+        1.f,0.f,0.f,
+		0.f,1.f,0.f,0.f,
+		0.f
+    };
+    memcpy(ret.m,m,8*sizeof(float));
+	ret.m[8] = 1.f;
+	return ret;
 }
 
 static float det23(struct Matrix3 mat, int i, int j, int k, int l){
@@ -2298,6 +2465,9 @@ void process_uniforms(int shader, int num_uniforms,
 void render_meshes(struct FrameData *frame_data, float aspect,
     struct GameData *data)
 {
+	glEnable(GL_DEPTH_TEST);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	int current_depth_test_state = 1;
     struct RenderMeshList *rml = &frame_data->render_mesh_list;
     while(rml != 0){
         for(int i=0;i<rml->num;i++){
@@ -2338,6 +2508,16 @@ void render_meshes(struct FrameData *frame_data, float aspect,
             }
             process_uniforms(shader, render_mesh->num_uniforms,
                 render_mesh->uniforms, data);
+
+			if (current_depth_test_state != render_mesh->depth_test) {
+				current_depth_test_state = render_mesh->depth_test;
+				if (current_depth_test_state) {
+					glEnable(GL_DEPTH_TEST);
+				}
+				else {
+					glDisable(GL_DEPTH_TEST);
+				}
+			}
             glDrawElements(GL_TRIANGLES, mesh->num_tris*3,GL_UNSIGNED_INT,(void*)0);
         }
         rml = rml->next;
@@ -2399,8 +2579,6 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
             glClear(GL_COLOR_BUFFER_BIT);
         }
         
-        glEnable(GL_DEPTH_TEST);
-        glClear(GL_DEPTH_BUFFER_BIT);
         render_meshes(frame_data,aspect,data);
         glDisable(GL_DEPTH_TEST);
         
@@ -2432,6 +2610,34 @@ void render_to_memory(int w, int h, unsigned char *pixels,
     render_internal(w, h, frame_data, data);
     glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void render_to_memory_float(int w, int h, float *pixels,
+    struct FrameData *frame_data, struct GameData *data)
+{
+
+
+    GLuint FramebufferName = 0;
+    glGenFramebuffers(1, &FramebufferName);
+    glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
+    GLuint renderedTexture;
+    glGenTextures(1, &renderedTexture);
+    glBindTexture(GL_TEXTURE_2D, renderedTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderedTexture, 0);
+    GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+    glDrawBuffers(sizeof(DrawBuffers)/sizeof(*DrawBuffers), DrawBuffers);
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+        printf("Error creating frame buffer!\n");
+        return;
+    }
+    render_internal(w, h, frame_data, data);
+	glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
+    glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, pixels);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	//glDeleteTextures(1, &renderedTexture);
 }
 
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data)

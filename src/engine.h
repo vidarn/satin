@@ -14,7 +14,7 @@ struct Vec2{
 // [ 0  1  2]
 // [ 3  4  5]
 // [ 6  7  8]
-struct Matrix3{
+struct _declspec(align(32)) Matrix3{
     float m[9];
 };
 #define M3(mat,x,y) mat.m[x*3+y]
@@ -62,19 +62,22 @@ extern int reference_resolution;
 
 struct Shader;
 #define SHADER_UNIFORM_TYPES \
-SHADER_UNIFORM_TYPE(INT,   sizeof(int))\
-SHADER_UNIFORM_TYPE(FLOAT,   sizeof(float))\
-SHADER_UNIFORM_TYPE(MAT4,  16*sizeof(float))\
-SHADER_UNIFORM_TYPE(MAT3,   9*sizeof(float))\
-SHADER_UNIFORM_TYPE(VEC4,   4*sizeof(float))\
-SHADER_UNIFORM_TYPE(VEC3,   3*sizeof(float))\
-SHADER_UNIFORM_TYPE(VEC2,   2*sizeof(float))\
-SHADER_UNIFORM_TYPE(TEX2,   sizeof(int))\
-SHADER_UNIFORM_TYPE(SPRITE, sizeof(int))\
-SHADER_UNIFORM_TYPE(SPRITE_POINTER, sizeof(void *))
+SHADER_UNIFORM_TYPE(INT,    1,sizeof(int), GL_INT)\
+SHADER_UNIFORM_TYPE(FLOAT,  1,sizeof(float), GL_FLOAT)\
+SHADER_UNIFORM_TYPE(MAT4,  16,sizeof(float), GL_FLOAT)\
+SHADER_UNIFORM_TYPE(MAT3,   9,sizeof(float), GL_FLOAT)\
+SHADER_UNIFORM_TYPE(VEC4,   4,sizeof(float), GL_FLOAT)\
+SHADER_UNIFORM_TYPE(VEC3,   3,sizeof(float), GL_FLOAT)\
+SHADER_UNIFORM_TYPE(VEC2,   2,sizeof(float), GL_FLOAT)\
+SHADER_UNIFORM_TYPE(HALF,   1,            2, GL_HALF_FLOAT)\
+SHADER_UNIFORM_TYPE(HALF2,  2,            2, GL_HALF_FLOAT)\
+SHADER_UNIFORM_TYPE(HALF3,  3,            2, GL_HALF_FLOAT)\
+SHADER_UNIFORM_TYPE(TEX2,   1,sizeof(int), GL_INT)\
+SHADER_UNIFORM_TYPE(SPRITE, 1,sizeof(int), GL_INT)\
+SHADER_UNIFORM_TYPE(SPRITE_POINTER, 1, sizeof(void *), GL_INT)
 
 enum ShaderUniformType{
-#define SHADER_UNIFORM_TYPE(name,size) SHADER_UNIFORM_##name,
+#define SHADER_UNIFORM_TYPE(name,num,size,gl_type) SHADER_UNIFORM_##name,
     SHADER_UNIFORM_TYPES
 #undef SHADER_UNIFORM_TYPE
 };
@@ -93,10 +96,16 @@ struct Vec3 normalize_vec3(struct Vec3);
 
 struct Color rgb(float r, float g, float b);
 struct Color rgba(float r, float g, float b, float a);
+extern struct Color color_white;
+extern struct Color color_black;
 
 struct Matrix3 multiply_matrix3(struct Matrix3 a, struct Matrix3 b);
 struct Matrix3 get_rotation_matrix3(float x,float y,float z);
 struct Matrix3 lu_decompose_matrix3(struct Matrix3 mat);
+struct Matrix3 get_translation_matrix3(float x,float y);
+struct Matrix3 get_scale_matrix3(float s);
+struct Matrix3 get_scale_matrix3_non_uniform(float sx, float sy);
+struct Matrix3 get_identity_matrix3(void);
 struct Matrix3 invert_matrix3(struct Matrix3 mat);
 struct Matrix3 transpose_matrix3(struct Matrix3 mat);
 struct Vec3 solve_LU_matrix3_vec3(struct Matrix3 lu, struct Vec3 y);
@@ -167,6 +176,8 @@ void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
 
 void render_to_memory(int w, int h, unsigned char *pixels,
     struct FrameData *frame_data, struct GameData *data);
+void render_to_memory_float(int w, int h, float *pixels,
+	struct FrameData *frame_data, struct GameData *data);
 
 float get_string_render_width(int font_id, const char *text, int len,
     struct GameData *data);
@@ -183,11 +194,24 @@ int load_mesh_unit_plane(int shader, struct GameData *data);
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, struct Vec2 *uv_data, int num_faces,
     int *face_data, int shader, struct GameData *data);
+
+struct CustomMeshDataSpec
+{
+	unsigned char *data;
+	const char *name;
+	enum ShaderUniformType type;
+};
+int load_custom_mesh_from_memory(int num_verts, int num_tris,
+	int *tri_data, int shader, struct GameData *data, int num_data_specs, struct CustomMeshDataSpec *data_spec)
+;
+
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data);
 void calculate_mesh_normals(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, int num_tris, int *tri_data);
 void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
     struct Vec3 *normal_data, struct Vec2 *uv_data, struct GameData *data);
+void update_custom_mesh_verts_from_memory(int mesh, int num_data_spect, struct CustomMeshDataSpec *data_spec,
+	struct GameData *data);
 int get_mesh_num_verts(int mesh, struct GameData *data);
 void get_mesh_vert_data(int mesh, struct Vec3 *pos_data, struct Vec3 *normal_data,
     struct Vec2 *uv_data, struct GameData *data);
@@ -199,6 +223,8 @@ void update_sprite_from_memory(int sprite, unsigned char *sprite_data,
 
 int load_shader(const char* vert_filename,const char * frag_filename,
     struct GameData *data, ...);
+int load_shader_from_string(const char* vert_source, const char * frag_source,
+	struct GameData *data);
 
 int get_mean_ticks(int length, struct GameData *data);
 int get_tick_length(struct GameData *data);
@@ -227,7 +253,7 @@ int cursor_locked(struct GameData *data);
 void lock_cursor(struct GameData *data);
 void unlock_cursor(struct GameData *data);
 
-int was_key_typed(int key, struct InputState *input_state);
+int was_key_typed(unsigned int key, struct InputState *input_state);
 int is_key_down(int key);
 
 float sum_values(float *values, int num);
@@ -292,6 +318,8 @@ struct RenderContext
     struct FrameData *frame_data;
     struct GameData *data;
     struct Matrix4 camera_3d;
+    struct Matrix3 camera_2d;
+	int disable_depth_test;
 };
 
 
