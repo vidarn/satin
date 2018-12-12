@@ -459,3 +459,9 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	wglDeleteContext(hRC);
 	DestroyWindow(hWnd);
 }
+
+char **get_args(int *argc)
+{
+	*argc = __argc;
+	return __argv;
+}
