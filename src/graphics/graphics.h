@@ -23,6 +23,7 @@ struct RenderMesh{
     float cam[16];
     int mesh;
     int num_uniforms;
+	int depth_test;
 };
 
 struct RenderLine{
@@ -34,7 +35,10 @@ struct RenderLine{
 
 struct RenderQuad{
     struct ShaderUniform *uniforms;
-    float m[9];
+	//NOTE(Vidar):This is a matrix3
+	//TODO(Vidar):Handle this better
+    float _declspec(align(32)) m[9];
+	float pad[7];
     int num_uniforms;
     int shader;
 };

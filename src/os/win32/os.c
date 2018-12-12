@@ -6,7 +6,6 @@
 #include <Pathcch.h>
 #pragma comment(lib, "Pathcch.lib") 
 
-
 FILE *open_file(const char *filename,const char *extension,const char *mode)
 {
 #define _SATIN_OPEN_FILE_MAX_PATH_LEN PATHCCH_MAX_CCH
@@ -30,30 +29,38 @@ FILE *open_file(const char *filename,const char *extension,const char *mode)
 	size_t mode_len = 0;
 	mbstowcs_s(&mode_len, mode_w, sizeof(mode_w)/sizeof(wchar_t), mode, _TRUNCATE);
 
-	/*
-	OutputDebugStringW(L"path_w: ");
-	OutputDebugStringW(path_w);
-	OutputDebugStringW(L"\n");
-	*/
-
 	FILE *fp = 0;
 	_wfopen_s(&fp, path_w, mode_w);
 
-	/*
-    char *path="C:\\Users\\vidnel\\Documents\\projects\\masters_thesis\\code";
-    char *buffer=(char*)calloc(strlen(filename)+strlen(extension)+strlen(path)+32,1);
-    sprintf(buffer,"%s\\data\\%s%s",path,filename,extension);
-    printf("loading file %s\n",buffer);
-    FILE *fp = fopen(buffer,mode);
-    free(buffer);
-	*/
     return fp;
 #undef _SATIN_OPEN_FILE_MAX_PATH_LEN
 }
 
+#include <commdlg.h>
 char *get_save_file_name(const char *title)
 {
-    return(_strdup("Implement me!"));
+	OPENFILENAME ofn = { 0 };
+	ofn.lStructSize = sizeof(ofn);
+	char szFileName[MAX_PATH] = { 0 };
+	ofn.lpstrFile = (LPWSTR)szFileName;
+	ofn.nMaxFile = MAX_PATH;
+	if (GetSaveFileNameA(&ofn)) {
+		return strdup(ofn.lpstrFile);
+	}
+    return 0;
+}
+
+char *get_open_file_name(const char *title)
+{
+	OPENFILENAME ofn = { 0 };
+	ofn.lStructSize = sizeof(ofn);
+	char szFileName[MAX_PATH] = { 0 };
+	ofn.lpstrFile = (LPWSTR)szFileName;
+	ofn.nMaxFile = MAX_PATH;
+	if (GetOpenFileNameA(&ofn)) {
+		return strdup(ofn.lpstrFile);
+	}
+    return 0;
 }
 
 LARGE_INTEGER counter_frequency;
@@ -326,6 +333,30 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				}
 				break;
 			}
+			case WM_KEYDOWN:
+			{
+				int handled = 0;
+				if (input_state.num_keys_typed < max_num_keys_typed) {
+					int ok = 0;
+					switch (msg.wParam)
+					{
+					case VK_LEFT:
+						ok = 1; break;
+					case VK_RIGHT:
+						ok = 1; break;
+					}
+					if (ok) {
+						input_state.keys_typed[input_state.num_keys_typed] = msg.wParam;
+						input_state.num_keys_typed++;
+						handled = 1;
+					}
+				}
+				if (!handled) {
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+				break;
+			}
 			case WM_LBUTTONDOWN:
 			{
 				input_state.mouse_state = MOUSE_CLICKED;
@@ -340,6 +371,10 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				input_state.mouse_down = 0;
 				input_state.mouse_state = MOUSE_NOTHING;
 				break;
+			}
+			case WM_MOUSEWHEEL:
+			{
+				input_state.scroll_delta_y = (float)GET_WHEEL_DELTA_WPARAM(msg.wParam)/120.f;
 			}
 			default:
 				TranslateMessage(&msg);
@@ -449,6 +484,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				input_state.mouse_state = MOUSE_NOTHING;
 			}
 			input_state.num_keys_typed = 0;
+			input_state.scroll_delta_y = 0.f;
 		}
 	}
 
