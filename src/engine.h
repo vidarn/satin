@@ -188,6 +188,7 @@ int load_font(const char *name, double font_size,
 int load_sprite_from_memory(int sprite_w, int sprite_h,
     unsigned char *sprite_data, struct GameData *data);
 int load_sprite(const char *name, struct GameData *data);
+int load_sprite_from_filename(const char *filename, struct GameData *data);
 int load_mesh(const char *name, int shader,
     struct GameData *data);
 int load_mesh_unit_plane(int shader, struct GameData *data);

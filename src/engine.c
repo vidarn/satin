@@ -1046,15 +1046,9 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
     return ret;
 }
 
-int load_sprite(const char *name, struct GameData *data)
+static int internal_load_sprite_from_fp(FILE *fp, const char *name, struct GameData *data)
 {
-
-    //TODO(Vidar):Read from a faster file format??
-    //Could use TURBO-jpeg?
-    //Or some compression that is supported by the hardware on IOS??
-
     int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, ".png", "rb");
     if(fp){
         unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
             &sprite_h, &sprite_channels, 4);
@@ -1066,6 +1060,24 @@ int load_sprite(const char *name, struct GameData *data)
         return 0;
     }
 }
+
+int load_sprite(const char *name, struct GameData *data)
+{
+
+    //TODO(Vidar):Read from a faster file format??
+    //Could use TURBO-jpeg?
+    //Or some compression that is supported by the hardware on IOS??
+
+    FILE *fp=open_file(name, ".png", "rb");
+	return internal_load_sprite_from_fp(fp, name, data);
+}
+
+int load_sprite_from_filename(const char *filename, struct GameData *data)
+{
+	FILE *fp = fopen(filename, "rb");
+	return internal_load_sprite_from_fp(fp, filename, data);
+}
+
 
 float get_font_height(int font, struct GameData *data)
 {
