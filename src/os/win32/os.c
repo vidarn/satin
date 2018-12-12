@@ -501,3 +501,11 @@ char **get_args(int *argc)
 	*argc = __argc;
 	return __argv;
 }
+
+char *get_cwd()
+{
+	size_t len = GetCurrentDirectoryA(0, 0);
+	char *ret = calloc(len + 1, 1);
+	GetCurrentDirectoryA(len, ret);
+	return ret;
+}

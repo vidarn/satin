@@ -19,3 +19,4 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	int num_game_states, void *param, struct GameState *game_states);
 
 char **get_args(int *argc);
+char *get_cwd();
