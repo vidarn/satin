@@ -488,6 +488,8 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 		}
 	}
 
+	end_game(game_data);
+
 	CloseHandle(timer);
 
 	wglMakeCurrent(NULL, NULL);
