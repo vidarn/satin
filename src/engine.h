@@ -222,6 +222,10 @@ void get_mesh_tri_data(int mesh, int *tri_data, struct GameData *data);
 void update_sprite_from_memory(int sprite, unsigned char *sprite_data,
    struct GameData *data);
 
+void resize_image_from_memory(int sprite, int sprite_w, int sprite_h, unsigned char *sprite_data,
+	struct GameData *data)
+;
+
 int load_shader(const char* vert_filename,const char * frag_filename,
     struct GameData *data, ...);
 int load_shader_from_string(const char* vert_source, const char * frag_source,
