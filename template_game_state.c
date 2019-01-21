@@ -37,3 +37,10 @@ void update_template(int ticks, struct InputState input_state,
     struct Color clear_col = {0.8f,0.8f,0.8f,0.f};
     frame_data_clear(state_data->main_frame_data, clear_col);
 }
+
+struct GameState template_game_state = {
+	update_template,
+	init_template,
+	destroy_template,
+	0
+};

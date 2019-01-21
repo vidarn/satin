@@ -1,4 +1,5 @@
 #include "os/os.h"
+#include "engine.h"
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <stdlib.h>
@@ -6,14 +7,47 @@
 #include <Pathcch.h>
 #pragma comment(lib, "Pathcch.lib") 
 
-FILE *open_file(const char *filename,const char *extension,const char *mode)
-{
 #define _SATIN_OPEN_FILE_MAX_PATH_LEN PATHCCH_MAX_CCH
-    HMODULE hModule=GetModuleHandleA(NULL);
+
+struct Win32Data {
+    WCHAR data_base_path[_SATIN_OPEN_FILE_MAX_PATH_LEN];
+};
+
+static void set_data_base_path(struct Win32Data *os_data, WCHAR *data_folder_name)
+{
+    HMODULE hModule = NULL;
+    //HMODULE hModule=GetModuleHandleA(NULL);
+	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+		GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		(LPCSTR)&reference_resolution,
+		&hModule);
+    GetModuleFileNameW(hModule,os_data->data_base_path,MAX_PATH);
+    PathCchRemoveFileSpec(os_data->data_base_path,MAX_PATH);
+	PathCchAppendEx(os_data->data_base_path, _SATIN_OPEN_FILE_MAX_PATH_LEN, data_folder_name, PATHCCH_ALLOW_LONG_PATHS);
+}
+
+void *os_data_create(void)
+{
+	struct Win32Data *os_data = calloc(1, sizeof(struct Win32Data));
+	set_data_base_path(os_data, L"data/");
+	return os_data;
+}
+void os_data_set_data_folder_name(void *os_data, char *path)
+{
+	size_t len = 0;
+	mbstowcs_s(&len, NULL, 0, path, 0);
+	WCHAR *buffer = calloc(len, sizeof(WCHAR));
+	mbstowcs_s(&len, buffer, len*sizeof(WCHAR), path, _TRUNCATE);
+	set_data_base_path(os_data, buffer);
+	free(buffer);
+}
+
+FILE *open_file(const char *filename,const char *extension,const char *mode, struct GameData *data)
+{
     WCHAR path_w[_SATIN_OPEN_FILE_MAX_PATH_LEN];
-    GetModuleFileNameW(hModule,path_w,MAX_PATH);
-    PathCchRemoveFileSpec(path_w,MAX_PATH);
-	PathCchAppendEx(path_w, _SATIN_OPEN_FILE_MAX_PATH_LEN, L"\\data\\", PATHCCH_ALLOW_LONG_PATHS);
+
+	struct Win32Data *os_data = (struct Win32Data *)get_os_data(data);
+	memcpy(path_w, os_data->data_base_path, _SATIN_OPEN_FILE_MAX_PATH_LEN * sizeof(WCHAR));
 
 	size_t path_len = wcslen(path_w);
 	size_t filename_len = 0;
@@ -33,7 +67,6 @@ FILE *open_file(const char *filename,const char *extension,const char *mode)
 	_wfopen_s(&fp, path_w, mode_w);
 
     return fp;
-#undef _SATIN_OPEN_FILE_MAX_PATH_LEN
 }
 
 #include <commdlg.h>
@@ -83,6 +116,13 @@ const char *get_computer_name(void)
 		GetComputerNameA(buffer, &len);
 	}
 	return buffer;
+}
+
+int get_num_cores(void)
+{
+	SYSTEM_INFO system_info = { 0 };
+	GetSystemInfo(&system_info);
+	return system_info.dwNumberOfProcessors;
 }
 
 int os_is_key_down(int key) {
@@ -295,7 +335,8 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 
 	ShowWindow(hWnd, SW_SHOW);
 
-	struct GameData* game_data = init(num_game_states, game_states, param);
+	struct Win32Data* os_data = os_data_create();
+	struct GameData* game_data = init(num_game_states, game_states, param, &os_data);
 
 	HANDLE timer = CreateWaitableTimerA(NULL, TRUE, "Engine FPS timer");
 	if (!timer) {

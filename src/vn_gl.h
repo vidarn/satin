@@ -90,9 +90,9 @@ static int compile_shader(const char* vert_source,const char * frag_source,
 }
 
 static char *read_entire_file(const char* filename, const char *extension,
-                              int *len)
+                              int *len, struct GameData *data)
 {
-    FILE *f=open_file(filename, extension, "rt");
+    FILE *f=open_file(filename, extension, "rt", data);
 	if(f==NULL){
 		return 0;
 	}
@@ -114,18 +114,18 @@ struct Shader{
 };
 
 static struct Shader compile_shader_filename_vararg(const char* vert_source,const char * frag_source,
-	char *error_buffer,int error_buffer_len, const char *version_string, va_list args)
+	char *error_buffer,int error_buffer_len, const char *version_string, struct GameData *data, va_list args)
 {
 	struct Shader ret={0};
 	ret.shader=-1;
 	int len;
-	char *vert_s=read_entire_file(vert_source,".vert",&len);
+	char *vert_s=read_entire_file(vert_source,".vert",&len,data);
 	if(vert_s==0){
 		sprintf(error_buffer,"\"%s.vert\" does not exist\n",vert_source);
 		return ret;
 	}
 
-	char *frag_s=read_entire_file(frag_source,".frag",&len);
+	char *frag_s=read_entire_file(frag_source,".frag",&len,data);
 	if(frag_s==0){
 		sprintf(error_buffer,"\"%s.frag\" does not exist\n",frag_source);
 		return ret;
@@ -171,12 +171,12 @@ static struct Shader compile_shader_filename_vararg(const char* vert_source,cons
 
 //NOTE(Vidar): You must pass (char*)0 as the last argument!!
 static struct Shader compile_shader_filename(const char* vert_source,const char * frag_source,
-	char *error_buffer,int error_buffer_len, const char *version_string, ...)
+	char *error_buffer,int error_buffer_len, const char *version_string, struct GameData *data, ...)
 {
     va_list args;
-    va_start(args,version_string);
+    va_start(args,data);
     struct Shader s = compile_shader_filename_vararg(vert_source, frag_source, error_buffer,
-            error_buffer_len, version_string, args);
+            error_buffer_len, version_string, data, args);
     va_end(args);
     return s;
 }

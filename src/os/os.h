@@ -4,7 +4,7 @@
 
 
 char *get_file_path(const char *filename, const char *extension);
-FILE *open_file(const char *filename, const char *extension, const char *mode);
+FILE *open_file(const char *filename, const char *extension, const char *mode, struct GameData *data);
 char *get_save_file_name(const char *title);
 char *get_open_file_name(const char *title);
 uint64_t get_current_tick(void);
@@ -17,3 +17,6 @@ int atomic_increment_int32(int *a);
 
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console,
 	int num_game_states, void *param, struct GameState *game_states);
+
+void *os_data_create(void);
+void os_data_set_data_folder_name(void *os_data, char *path);

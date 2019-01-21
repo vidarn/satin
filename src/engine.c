@@ -117,6 +117,7 @@ struct GameData{
     float window_min_x, window_max_x;
     float window_min_y, window_max_y;
 	int lock_cursor;
+	void *os_data;
 };
 
 int hero_sprite;
@@ -497,7 +498,7 @@ int load_mesh(const char *name, int shader,
     struct GameData *data)
 {
     //TODO(Vidar):Don't use obj!!
-    FILE *fp=open_file(name,".obj","rb");
+    FILE *fp=open_file(name,".obj","rb",data);
     if(fp){
         fseek(fp,0,SEEK_END);
         size_t len=ftell(fp);
@@ -821,7 +822,7 @@ int load_custom_mesh_from_memory(int num_verts, int num_tris,
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data)
 {
 	//TODO(Vidar):Only supports OBJ for now
-	FILE *fp = open_file(name, ext, "wt");
+	FILE *fp = open_file(name, ext, "wt",data);
 	if (fp) {
 		struct Mesh m = data->meshes[mesh];
 		int num_verts = m.num_verts;
@@ -957,7 +958,7 @@ int load_shader(const char* vert_filename, const char * frag_filename,
     va_start(args,data);
     struct Shader shader = compile_shader_filename_vararg(vert_filename,
         frag_filename, error_buffer, ERROR_BUFFER_LEN, "#version 330\n",
-        args);
+        data, args);
     va_end(args);
     if(error_buffer[0] != 0){
         printf("Shader compilation error:\n%s\n",error_buffer);
@@ -987,7 +988,7 @@ int load_shader_from_string(const char* vert_source, const char * frag_source,
 static int load_image(const char *name, struct GameData *data)
 {
     int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, ".png", "rb");
+    FILE *fp=open_file(name, ".png", "rb", data);
     unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
         &sprite_h, &sprite_channels, 4);
     fclose(fp);
@@ -1054,7 +1055,7 @@ int load_sprite(const char *name, struct GameData *data)
     //Or some compression that is supported by the hardware on IOS??
 
     int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, ".png", "rb");
+    FILE *fp=open_file(name, ".png", "rb", data);
     if(fp){
         unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
             &sprite_h, &sprite_channels, 4);
@@ -1074,7 +1075,7 @@ float get_font_height(int font, struct GameData *data)
 
 int load_font(const char *name, double font_size, struct GameData *data)
 {
-    FILE *fp = open_file(name,".ttf","rb");
+    FILE *fp = open_file(name,".ttf","rb",data);
     if(!fp){
         //TODO(Vidar):Report error somehow...
         return -1;
@@ -1478,9 +1479,20 @@ float sum_values(float *values, int num)
     return sum;
 }
 
-struct GameData *init(int num_game_states, struct GameState *game_states, void *param)
+void *get_os_data(struct GameData *data)
+{
+	return data->os_data;
+}
+
+void  set_os_data(void *os_data, struct GameData *data)
+{
+	data->os_data = os_data;
+}
+
+struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data)
 {
     struct GameData *data = calloc(1,sizeof(struct GameData));
+	set_os_data(os_data,data);
     data->sprite_shader = load_shader("sprite", "sprite", data, "pos", "uv",(char*)0);
 
     data->line_shader = load_shader("line", "line" , data, "pos", (char*)0);
@@ -2591,6 +2603,23 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
 void render_to_memory(int w, int h, unsigned char *pixels,
     struct FrameData *frame_data, struct GameData *data)
 {
+	float old_window_min_x = data->window_min_x;
+	float old_window_max_x = data->window_max_x;
+	float old_window_min_y = data->window_min_y;
+	float old_window_max_y = data->window_max_y;
+    float min_size =
+        (float)(w > h ? h : w);
+    float pad = fabsf((float)(w - h))*0.5f/min_size;
+    data->window_min_x = 0.f; data->window_max_x = 1.f;
+    data->window_min_y = 0.f; data->window_max_y = 1.f;
+    if(w > h){
+        data->window_min_x -= pad;
+        data->window_max_x += pad;
+    }else{
+        data->window_min_y -= pad;
+        data->window_max_y += pad;
+    }
+
     GLuint FramebufferName = 0;
     glGenFramebuffers(1, &FramebufferName);
     glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
@@ -2610,11 +2639,32 @@ void render_to_memory(int w, int h, unsigned char *pixels,
     render_internal(w, h, frame_data, data);
     glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	data->window_min_x = old_window_min_x;
+	data->window_max_x = old_window_max_x;
+	data->window_min_y = old_window_min_y;
+	data->window_max_y = old_window_max_y;
 }
 
 void render_to_memory_float(int w, int h, float *pixels,
     struct FrameData *frame_data, struct GameData *data)
 {
+	float old_window_min_x = data->window_min_x;
+	float old_window_max_x = data->window_max_x;
+	float old_window_min_y = data->window_min_y;
+	float old_window_max_y = data->window_max_y;
+    float min_size =
+        (float)(w > h ? h : w);
+    float pad = fabsf((float)(w - h))*0.5f/min_size;
+    data->window_min_x = 0.f; data->window_max_x = 1.f;
+    data->window_min_y = 0.f; data->window_max_y = 1.f;
+    if(w > h){
+        data->window_min_x -= pad;
+        data->window_max_x += pad;
+    }else{
+        data->window_min_y -= pad;
+        data->window_max_y += pad;
+    }
 
 
     GLuint FramebufferName = 0;
@@ -2638,6 +2688,11 @@ void render_to_memory_float(int w, int h, float *pixels,
     glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, pixels);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	//glDeleteTextures(1, &renderedTexture);
+
+	data->window_min_x = old_window_min_x;
+	data->window_max_x = old_window_max_x;
+	data->window_min_y = old_window_min_y;
+	data->window_max_y = old_window_max_y;
 }
 
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data)

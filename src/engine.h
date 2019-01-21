@@ -39,7 +39,7 @@ struct Vec4{
     };
 };
 
-struct GameData *init(int num_game_states, struct GameState *game_states, void *param);
+struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data);
 void update(int ticks, struct InputState input_state, struct GameData *data);
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data);
 void end_game(struct GameData *data);
@@ -257,6 +257,9 @@ int was_key_typed(unsigned int key, struct InputState *input_state);
 int is_key_down(int key);
 
 float sum_values(float *values, int num);
+
+void *get_os_data(struct GameData *data);
+void  set_os_data(void *os_data, struct GameData *data);
 
 //Input
 enum MouseState {
