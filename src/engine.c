@@ -42,9 +42,9 @@ static const int uniform_nums[] = {
 };
 
 struct SpriteData{
-    int loaded;
     int w,h;
     int x,y;
+	int should_be_packed;
     unsigned char* data;
 };
 
@@ -985,13 +985,9 @@ int load_shader_from_string(const char* vert_source, const char * frag_source,
     return data->num_shaders - 1;
 }
 
-static int load_image(const char *name, struct GameData *data)
+int load_image_from_memory(int sprite_w, int sprite_h,
+	unsigned char *sprite_data, struct GameData *data)
 {
-    int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, ".png", "rb", data);
-    unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
-        &sprite_h, &sprite_channels, 4);
-    fclose(fp);
     int texture = add_texture(sprite_data, sprite_w, sprite_h,GL_RGBA,data);
     struct Sprite s;
     s.uv_offset[0] = 0.f;
@@ -1003,12 +999,30 @@ static int load_image(const char *name, struct GameData *data)
     s.inv_aspect   = (float)sprite_h/(float)sprite_w;
 
     //TODO(Vidar): double the amount of sprites instead?
-    data->images = realloc(data->sprites,(data->num_sprites+1)
+    data->sprites = realloc(data->sprites,(data->num_sprites+1)
         *sizeof(struct Sprite));
-    data->images[data->num_images] = s;
-    data->num_images++;
+    data->sprite_data = realloc(data->sprite_data,(data->num_sprites+1)
+        *sizeof(struct SpriteData));
+    data->sprites[data->num_sprites] = s;
+    struct SpriteData *sd = data->sprite_data + data->num_sprites;
+	sd->should_be_packed = 0;
+	sd->w = sprite_w;
+	sd->h = sprite_h;
+	sd->x = 0;
+	sd->y = 0;
+    data->num_sprites++;
 
-    return data->num_images-1;
+    return data->num_sprites-1;
+}
+
+int load_image(const char *name, struct GameData *data)
+{
+    int sprite_channels, sprite_w, sprite_h;
+    FILE *fp=open_file(name, ".png", "rb");
+    unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
+        &sprite_h, &sprite_channels, 4);
+    fclose(fp);
+	return load_image_from_memory(sprite_w, sprite_h, sprite_data, data);
 }
 
 void update_sprite_from_memory(int sprite, unsigned char *sprite_data,
@@ -1020,6 +1034,25 @@ void update_sprite_from_memory(int sprite, unsigned char *sprite_data,
     glBindTexture(GL_TEXTURE_2D, data->texture_ids[s->texture]);
     glTexSubImage2D(GL_TEXTURE_2D, 0, sd->x, sd->y, sd->w, sd->h, GL_RGBA,
         GL_UNSIGNED_BYTE, sprite_data);
+}
+
+void resize_image_from_memory(int sprite, int sprite_w, int sprite_h, unsigned char *sprite_data,
+    struct GameData *data)
+{
+    struct Sprite *s = data->sprites + sprite;
+    s->width        = (float)sprite_w;
+    s->inv_aspect   = (float)sprite_h/(float)sprite_w;
+    struct SpriteData *sd = data->sprite_data + sprite;
+	assert(sd->should_be_packed == 0);
+	sd->w = sprite_w;
+	sd->h = sprite_h;
+	sd->x = 0;
+	sd->y = 0;
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, data->texture_ids[s->texture]);
+    glTexImage2D(GL_TEXTURE_2D, 0,GL_RGBA, sprite_w, sprite_h,
+        0, GL_RGBA, GL_UNSIGNED_BYTE, sprite_data);
 }
 
 int load_sprite_from_memory(int sprite_w, int sprite_h,
@@ -1038,7 +1071,6 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
     s->inv_aspect = (float)sprite_h/(float)sprite_w;
     s->width = (float)sprite_w;
 
-    sd->loaded = 1;
     sd->w = sprite_w;
     sd->h = sprite_h;
     sd->data = calloc(sd->w * sd->h, 4*sizeof(char));
@@ -1047,15 +1079,9 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
     return ret;
 }
 
-int load_sprite(const char *name, struct GameData *data)
+static int internal_load_sprite_from_fp(FILE *fp, const char *name, struct GameData *data)
 {
-
-    //TODO(Vidar):Read from a faster file format??
-    //Could use TURBO-jpeg?
-    //Or some compression that is supported by the hardware on IOS??
-
     int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, ".png", "rb", data);
     if(fp){
         unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
             &sprite_h, &sprite_channels, 4);
@@ -1067,6 +1093,24 @@ int load_sprite(const char *name, struct GameData *data)
         return 0;
     }
 }
+
+int load_sprite(const char *name, struct GameData *data)
+{
+
+    //TODO(Vidar):Read from a faster file format??
+    //Could use TURBO-jpeg?
+    //Or some compression that is supported by the hardware on IOS??
+
+    FILE *fp=open_file(name, ".png", "rb");
+	return internal_load_sprite_from_fp(fp, name, data);
+}
+
+int load_sprite_from_filename(const char *filename, struct GameData *data)
+{
+	FILE *fp = fopen(filename, "rb");
+	return internal_load_sprite_from_fp(fp, filename, data);
+}
+
 
 float get_font_height(int font, struct GameData *data)
 {
@@ -1152,11 +1196,13 @@ void create_sprite_atlas(struct GameData *data)
     stbrp_rect *rects = (stbrp_rect*)calloc(data->num_sprites,sizeof(stbrp_rect));
     struct SpriteData *sprite_data = data->sprite_data;
     for(int i=0;i<data->num_sprites;i++){
-        //printf("packing sprite %d of size %dx%d\n",i,sprite_data->w,
-            //sprite_data->h);
-        rects[i].id = i;
-        rects[i].w = sprite_data->w + pad*2;
-        rects[i].h = sprite_data->h + pad*2;
+		if (sprite_data->should_be_packed) {
+			//printf("packing sprite %d of size %dx%d\n",i,sprite_data->w,
+				//sprite_data->h);
+			rects[i].id = i;
+			rects[i].w = sprite_data->w + pad * 2;
+			rects[i].h = sprite_data->h + pad * 2;
+		}
         sprite_data++;
     }
     int status = stbrp_pack_rects(&context,rects,data->num_sprites);
@@ -1167,40 +1213,47 @@ void create_sprite_atlas(struct GameData *data)
     float inv_w = 1.f/(float)w;
     float inv_h = 1.f/(float)h;
     for(int i=0;i<data->num_sprites;i++){
-        if(rects[i].was_packed){
-            //printf("Sprite %d was packed\n",i);
-            int x_offset = rects[i].x+pad;
-            int y_offset = rects[i].y+pad;
-            sprite_data->x = x_offset;
-            sprite_data->y = y_offset;
-            for(int iy=-pad;iy<sprite_data->h+pad;iy++){
-                int y = iy;
-                if(y < 0) y = 0;
-                if(y > sprite_data->h-1) y = sprite_data->h-1;
-                for(int ix=-pad;ix<sprite_data->w+pad;ix++){
-                    int x = ix;
-                    if(x < 0) x = 0;
-                    if(x > sprite_data->w-1) x = sprite_data->w-1;
-                    for(int c=0;c<4;c++){
-                        atlas_data[(ix+x_offset+(iy+y_offset)*w)*4+c] =
-                            sprite_data->data[(x+y*sprite_data->w)*4+c];
-                    }
-                }
-            }
-            sprite->uv_offset[0] = (float)x_offset*inv_w;
-            sprite->uv_offset[1] = (float)y_offset*inv_h;
-            sprite->uv_size[0] = sprite->width*inv_w;
-            sprite->uv_size[1] = sprite->width*sprite->inv_aspect*inv_h;
-        }else{
-            printf("Sprite %d was not packed\n",i);
-        }
+		if (sprite_data->should_be_packed) {
+			if (rects[i].was_packed) {
+				//printf("Sprite %d was packed\n",i);
+				int x_offset = rects[i].x + pad;
+				int y_offset = rects[i].y + pad;
+				sprite_data->x = x_offset;
+				sprite_data->y = y_offset;
+				for (int iy = -pad; iy < sprite_data->h + pad; iy++) {
+					int y = iy;
+					if (y < 0) y = 0;
+					if (y > sprite_data->h - 1) y = sprite_data->h - 1;
+					for (int ix = -pad; ix < sprite_data->w + pad; ix++) {
+						int x = ix;
+						if (x < 0) x = 0;
+						if (x > sprite_data->w - 1) x = sprite_data->w - 1;
+						for (int c = 0; c < 4; c++) {
+							atlas_data[(ix + x_offset + (iy + y_offset)*w) * 4 + c] =
+								sprite_data->data[(x + y * sprite_data->w) * 4 + c];
+						}
+					}
+				}
+				sprite->uv_offset[0] = (float)x_offset*inv_w;
+				sprite->uv_offset[1] = (float)y_offset*inv_h;
+				sprite->uv_size[0] = sprite->width*inv_w;
+				sprite->uv_size[1] = sprite->width*sprite->inv_aspect*inv_h;
+			}
+			else {
+				printf("Sprite %d was not packed\n", i);
+			}
+		}
         sprite_data++;
         sprite++;
     }
     int texture_id = add_texture(atlas_data,w,h,GL_RGBA,data);
     sprite=data->sprites;
+	sprite_data = data->sprite_data;
     for(int i=0;i<data->num_sprites;i++){
-        sprite->texture = texture_id;
+		if (sprite_data->should_be_packed) {
+			sprite->texture = texture_id;
+		}
+        sprite_data++;
         sprite++;
     }
     //printf("Atlas created\n");

@@ -529,10 +529,26 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 		}
 	}
 
+	end_game(game_data);
+
 	CloseHandle(timer);
 
 	wglMakeCurrent(NULL, NULL);
 	ReleaseDC(hWnd, hDC);
 	wglDeleteContext(hRC);
 	DestroyWindow(hWnd);
+}
+
+char **get_args(int *argc)
+{
+	*argc = __argc;
+	return __argv;
+}
+
+char *get_cwd()
+{
+	size_t len = GetCurrentDirectoryA(0, 0);
+	char *ret = calloc(len + 1, 1);
+	GetCurrentDirectoryA(len, ret);
+	return ret;
 }
