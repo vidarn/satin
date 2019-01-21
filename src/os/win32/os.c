@@ -19,7 +19,7 @@ static void set_data_base_path(struct Win32Data *os_data, WCHAR *data_folder_nam
     //HMODULE hModule=GetModuleHandleA(NULL);
 	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
 		GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-		(LPCSTR)&reference_resolution,
+		(LPCWSTR)&reference_resolution,
 		&hModule);
     GetModuleFileNameW(hModule,os_data->data_base_path,MAX_PATH);
     PathCchRemoveFileSpec(os_data->data_base_path,MAX_PATH);
@@ -75,7 +75,7 @@ char *get_save_file_name(const char *title)
 	OPENFILENAME ofn = { 0 };
 	ofn.lStructSize = sizeof(ofn);
 	char szFileName[MAX_PATH] = { 0 };
-	ofn.lpstrFile = (LPWSTR)szFileName;
+	ofn.lpstrFile = (LPSTR)szFileName;
 	ofn.nMaxFile = MAX_PATH;
 	if (GetSaveFileNameA(&ofn)) {
 		return strdup(ofn.lpstrFile);
@@ -88,7 +88,7 @@ char *get_open_file_name(const char *title)
 	OPENFILENAME ofn = { 0 };
 	ofn.lStructSize = sizeof(ofn);
 	char szFileName[MAX_PATH] = { 0 };
-	ofn.lpstrFile = (LPWSTR)szFileName;
+	ofn.lpstrFile = (LPSTR)szFileName;
 	ofn.nMaxFile = MAX_PATH;
 	if (GetOpenFileNameA(&ofn)) {
 		return strdup(ofn.lpstrFile);

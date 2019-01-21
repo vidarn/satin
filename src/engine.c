@@ -1018,7 +1018,7 @@ int load_image_from_memory(int sprite_w, int sprite_h,
 int load_image(const char *name, struct GameData *data)
 {
     int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, ".png", "rb");
+    FILE *fp=open_file(name, ".png", "rb",data);
     unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
         &sprite_h, &sprite_channels, 4);
     fclose(fp);
@@ -1101,7 +1101,7 @@ int load_sprite(const char *name, struct GameData *data)
     //Could use TURBO-jpeg?
     //Or some compression that is supported by the hardware on IOS??
 
-    FILE *fp=open_file(name, ".png", "rb");
+    FILE *fp=open_file(name, ".png", "rb",data);
 	return internal_load_sprite_from_fp(fp, name, data);
 }
 
