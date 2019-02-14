@@ -1,6 +1,5 @@
 #include "os/os.h"
 #include "engine.h"
-#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <stdlib.h>
 
@@ -129,8 +128,9 @@ int os_is_key_down(int key) {
 	return GetKeyState(key) < 0;
 }
 
-#include "GL/glew.h"
-#include "GL/wglew.h"
+//#include "GL/glew.h"
+//#include "GL/wglew.h"
+#include "opengl.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -322,14 +322,17 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	hRC_tmp = wglCreateContext(hDC);
 	wglMakeCurrent(hDC, hRC_tmp);
 
+	opengl_load();
+
+	/*
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
-		/* Problem: glewInit failed, something is seriously wrong. */
 		OutputDebugStringA("Error: \n");
 		MessageBoxA(NULL, "GLEW error"
 			"Could not initialize", "Error", MB_OK);
 		return;
 	}
+	*/
 
 	int attribs[] =
 	{
