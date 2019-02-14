@@ -1,5 +1,4 @@
 #include "os/os.h"
-#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <stdlib.h>
 
@@ -42,7 +41,7 @@ char *get_save_file_name(const char *title)
 	OPENFILENAME ofn = { 0 };
 	ofn.lStructSize = sizeof(ofn);
 	char szFileName[MAX_PATH] = { 0 };
-	ofn.lpstrFile = (LPWSTR)szFileName;
+	ofn.lpstrFile = (LPSTR)szFileName;
 	ofn.nMaxFile = MAX_PATH;
 	if (GetSaveFileNameA(&ofn)) {
 		return strdup(ofn.lpstrFile);
@@ -89,8 +88,9 @@ int os_is_key_down(int key) {
 	return GetKeyState(key) < 0;
 }
 
-#include "GL/glew.h"
-#include "GL/wglew.h"
+//#include "GL/glew.h"
+//#include "GL/wglew.h"
+#include "opengl.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -267,14 +267,17 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	hRC_tmp = wglCreateContext(hDC);
 	wglMakeCurrent(hDC, hRC_tmp);
 
+	opengl_load();
+
+	/*
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
-		/* Problem: glewInit failed, something is seriously wrong. */
 		OutputDebugStringA("Error: \n");
 		MessageBoxA(NULL, "GLEW error"
 			"Could not initialize", "Error", MB_OK);
 		return;
 	}
+	*/
 
 	int attribs[] =
 	{
