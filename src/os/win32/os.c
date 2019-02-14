@@ -275,12 +275,27 @@ CreateOpenGLWindow(const char* title, int x, int y, int width, int height,
 	return hWnd;
 }
 
+ void 
+error_message_callback(GLenum source,
+	GLenum type,
+	GLuint id,
+	GLenum severity,
+	GLsizei length,
+	const GLchar* message,
+	const void* userParam)
+{
+	fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+		(type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
+		type, severity, message);
+}
+
+
 #include <Xinput.h>
 float controller_left_thumb_deadzone = (float)XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE/32768.f;
 float controller_right_thumb_deadzone = (float)XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE/32768.f;
 
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console, 
-	int num_game_states, void *param, struct GameState *game_states)
+	int num_game_states, void *param, struct GameState *game_states, int debug_mode)
 {
 	framebuffer_w = _framebuffer_w;
 	framebuffer_h = _framebuffer_h;
@@ -318,15 +333,31 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 
 	int attribs[] =
 	{
-		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 1,
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
 		WGL_CONTEXT_FLAGS_ARB, 0,
 		0
 	};
+	if (debug_mode) {
+		attribs[2] |= WGL_CONTEXT_DEBUG_BIT_ARB;
+	}
 	hRC = wglCreateContextAttribsARB(hDC, 0, attribs);
 	wglMakeCurrent(NULL, NULL);
 	wglDeleteContext(hRC_tmp);
 	wglMakeCurrent(hDC, hRC);
+
+	if (debug_mode) {
+		glEnable(GL_DEBUG_OUTPUT);
+		//glDebugMessageCallback(error_message_callback, 0);
+		//TODO(Vidar):Implement this
+		PROC proc = wglGetProcAddress("glDebugMessageCallback");
+		if (proc) {
+			printf("hej\n");
+		}
+		else {
+			printf("Blaj\n");
+		}
+	}
 
 	const GLubyte *GLVersionString = glGetString(GL_VERSION);
 	OutputDebugStringA("GL version: ");
@@ -336,7 +367,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	ShowWindow(hWnd, SW_SHOW);
 
 	struct Win32Data* os_data = os_data_create();
-	struct GameData* game_data = init(num_game_states, game_states, param, &os_data);
+	struct GameData* game_data = init(num_game_states, game_states, param, &os_data, debug_mode);
 
 	HANDLE timer = CreateWaitableTimerA(NULL, TRUE, "Engine FPS timer");
 	if (!timer) {

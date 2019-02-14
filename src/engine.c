@@ -118,6 +118,7 @@ struct GameData{
     float window_min_y, window_max_y;
 	int lock_cursor;
 	void *os_data;
+	int debug_mode;
 };
 
 int hero_sprite;
@@ -399,9 +400,17 @@ void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
 }
 
 void render_mesh(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
-    int num_uniforms, struct RenderContext *context)
+	int num_uniforms, struct RenderContext *context)
+{
+	render_mesh_with_callback(mesh, mat, uniforms, num_uniforms, 0, 0, context);
+}
+
+void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
+    int num_uniforms, void(*callback)(void *param), void *callback_param, struct RenderContext *context)
 {
     struct RenderMesh render_mesh = {0};
+	render_mesh.callback = callback;
+	render_mesh.callback_param = callback_param;
 	render_mesh.depth_test = !context->disable_depth_test;
     render_mesh.mesh = mesh;
     *(struct Matrix4*)&render_mesh.m = mat;
@@ -788,7 +797,7 @@ int load_custom_mesh_from_memory(int num_verts, int num_tris,
     mesh.num_verts = num_verts;
     
     glBufferData(GL_ARRAY_BUFFER,total_data_len,vertex_data,
-                 GL_STATIC_DRAW);
+                 GL_DYNAMIC_DRAW);
     //TODO(Vidar):We should be able to free it now, right?
     //free(vertex_data);
 	int offset = 0;
@@ -892,20 +901,32 @@ void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
     }
     glUnmapBuffer(GL_ARRAY_BUFFER);
 }
+
+#pragma optimize("", off)
 void update_custom_mesh_verts_from_memory(int mesh, int num_data_specs, struct CustomMeshDataSpec *data_spec,
 	struct GameData *data)
 {
     struct Mesh m = data->meshes[mesh];
     glBindBuffer(GL_ARRAY_BUFFER, m.vertex_buffer);
     unsigned char *buffer = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-	for (int i = 0; i < num_data_specs; i++) {
-		struct CustomMeshDataSpec spec = data_spec[i];
-		int data_len = uniform_sizes[spec.type]*m.num_verts;
-		memcpy(buffer, spec.data, data_len);
-		buffer += data_len;
+	if (buffer) {
+		for (int i = 0; i < num_data_specs; i++) {
+			struct CustomMeshDataSpec spec = data_spec[i];
+			int data_len = uniform_sizes[spec.type] * m.num_verts;
+			memcpy(buffer, spec.data, data_len);
+			buffer += data_len;
+		}
+		glUnmapBuffer(GL_ARRAY_BUFFER);
 	}
-    glUnmapBuffer(GL_ARRAY_BUFFER);
+	else {
+		GLenum err;
+		while ((err = glGetError()) != GL_NO_ERROR)
+		{
+			printf("OpenGL error %d\n",err);
+		}
+	}
 }
+#pragma optimize("", on)
 
 int get_mesh_num_verts(int mesh, struct GameData *data)
 {
@@ -946,6 +967,11 @@ void get_mesh_tri_data(int mesh, int *tri_data, struct GameData *data)
     glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
 }
 
+unsigned int get_mesh_vertex_buffer(int mesh, struct GameData *data)
+{
+    struct Mesh m = data->meshes[mesh];
+	return m.vertex_buffer;
+}
 
 #define ERROR_BUFFER_LEN 512
 
@@ -1542,10 +1568,11 @@ void  set_os_data(void *os_data, struct GameData *data)
 	data->os_data = os_data;
 }
 
-struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data)
+struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data, int debug_mode)
 {
     struct GameData *data = calloc(1,sizeof(struct GameData));
 	set_os_data(os_data,data);
+	data->debug_mode = debug_mode;
     data->sprite_shader = load_shader("sprite", "sprite", data, "pos", "uv",(char*)0);
 
     data->line_shader = load_shader("line", "line" , data, "pos", (char*)0);
@@ -1576,10 +1603,12 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
             data->shaders[data->sprite_shader].shader, "uv");
         if(uv_loc == -1){
             printf("Error: Could not find \"uv\" attribute in sprite shader\n");
-        }
-        glEnableVertexAttribArray(uv_loc);
-        glVertexAttribPointer(uv_loc,2,GL_FLOAT,GL_FALSE,
-            4*sizeof(GL_FLOAT),(void*)(2*sizeof(GL_FLOAT)));
+		}
+		else {
+			glEnableVertexAttribArray(uv_loc);
+			glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE,
+				4 * sizeof(GL_FLOAT), (void*)(2 * sizeof(GL_FLOAT)));
+		}
     }
 
 	glGenVertexArrays(1,&data->line_vertex_array);
@@ -1623,19 +1652,21 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
 
     
-    data->active_game_state = 0;
-    data->game_states = calloc(1, sizeof(struct GameState));
-    data->num_game_states = 1;
-    data->game_states[0] = data->game_state_types[0];
-    data->game_states[0].init(data,param,-1);
+	if (num_game_states > 0) {
+		data->active_game_state = 0;
+		data->game_states = calloc(1, sizeof(struct GameState));
+		data->num_game_states = 1;
+		data->game_states[0] = data->game_state_types[0];
+		data->game_states[0].init(data, param, -1);
 
-    data->active_game_state = -1;
-    for(int i=1;i<data->num_game_state_types;i++){
-		struct GameState tmp_game_state = data->game_state_types[i];
-        tmp_game_state.init(data,0,-1);
-		tmp_game_state.destroy(data);
-    }
-    data->active_game_state = 0;
+		data->active_game_state = -1;
+		for (int i = 1; i < data->num_game_state_types; i++) {
+			struct GameState tmp_game_state = data->game_state_types[i];
+			tmp_game_state.init(data, 0, -1);
+			tmp_game_state.destroy(data);
+		}
+		data->active_game_state = 0;
+	}
 
     create_sprite_atlas(data);
 
@@ -2583,6 +2614,9 @@ void render_meshes(struct FrameData *frame_data, float aspect,
 					glDisable(GL_DEPTH_TEST);
 				}
 			}
+			if (render_mesh->callback) {
+				render_mesh->callback(render_mesh->callback_param);
+			}
             glDrawElements(GL_TRIANGLES, mesh->num_tris*3,GL_UNSIGNED_INT,(void*)0);
         }
         rml = rml->next;
@@ -2740,7 +2774,8 @@ void render_to_memory_float(int w, int h, float *pixels,
 	glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
     glReadPixels(0, 0, w, h, GL_RGBA, GL_FLOAT, pixels);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//glDeleteTextures(1, &renderedTexture);
+	glDeleteTextures(1, &renderedTexture);
+	glDeleteFramebuffers(1, &FramebufferName);
 
 	data->window_min_x = old_window_min_x;
 	data->window_max_x = old_window_max_x;

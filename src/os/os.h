@@ -16,7 +16,7 @@ int os_is_key_down(int key);
 int atomic_increment_int32(int *a);
 
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console,
-	int num_game_states, void *param, struct GameState *game_states);
+	int num_game_states, void *param, struct GameState *game_states, int debug_mode);
 
 void *os_data_create(void);
 void os_data_set_data_folder_name(void *os_data, char *path);

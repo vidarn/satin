@@ -39,7 +39,7 @@ struct Vec4{
     };
 };
 
-struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data);
+struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data, int debug_mode);
 void update(int ticks, struct InputState input_state, struct GameData *data);
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data);
 void end_game(struct GameData *data);
@@ -165,6 +165,8 @@ void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
 
 void render_mesh(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
                  int num_uniforms, struct RenderContext *context);
+void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
+	int num_uniforms, void(*callback)(void *param), void *callback_param, struct RenderContext *context);
 
 void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
     int num_uniforms, struct RenderContext *context);
@@ -218,6 +220,8 @@ void get_mesh_vert_data(int mesh, struct Vec3 *pos_data, struct Vec3 *normal_dat
     struct Vec2 *uv_data, struct GameData *data);
 int get_mesh_num_tris(int mesh, struct GameData *data);
 void get_mesh_tri_data(int mesh, int *tri_data, struct GameData *data);
+
+unsigned int get_mesh_vertex_buffer(int mesh, struct GameData *data);
 
 void update_sprite_from_memory(int sprite, unsigned char *sprite_data,
    struct GameData *data);

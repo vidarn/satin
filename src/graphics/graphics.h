@@ -19,6 +19,8 @@ struct RenderString{
 
 struct RenderMesh{
     struct ShaderUniform *uniforms;
+	void (*callback)(void *param);
+	void *callback_param;
     float m[16];
     float cam[16];
     int mesh;
