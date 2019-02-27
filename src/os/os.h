@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+struct GameData;
+struct GameState;
 
 char *get_file_path(const char *filename, const char *extension);
 FILE *open_file(const char *filename, const char *extension, const char *mode, struct GameData *data);

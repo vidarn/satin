@@ -21,7 +21,7 @@
 #include "graphics/graphics.h"
 #include "sort/sort.h"
 
-#include <immintrin.h>
+//#include <immintrin.h>
 
 static const int uniform_sizes[] = {
 #define SHADER_UNIFORM_TYPE(name,num,size,gl_type) num*size,
@@ -163,7 +163,7 @@ void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
     for(int i=0;i<num_uniforms;i++){
         enum ShaderUniformType type = uniforms[i].type;
         int size = uniform_sizes[type]*uniforms[i].num;
-        r->uniforms[i].name = _strdup(uniforms[i].name);
+        r->uniforms[i].name = strdup(uniforms[i].name);
         r->uniforms[i].type = type;
         r->uniforms[i].num  = uniforms[i].num;
         r->uniforms[i].data = calloc(1,size);
@@ -306,7 +306,7 @@ void render_string_screen_fancy(const char *string, int font_id, float *x, float
     {
         //TODO(Vidar):Actually use this???
         struct RenderString rs = {0};
-        rs.str = _strdup(string);
+        rs.str = strdup(string);
         rs.font = font_id;
         rs.x = 2.f*(context->w*(*x) + context->offset_x)-1.f;
         rs.y = 2.f*(context->h*(*y) + context->offset_y)-1.f;
@@ -421,7 +421,7 @@ void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUnifor
     for(int i=0;i<num_uniforms;i++){
         enum ShaderUniformType type = uniforms[i].type;
         int size = uniform_sizes[type]*uniforms[i].num;
-        render_mesh.uniforms[i].name = _strdup(uniforms[i].name);
+        render_mesh.uniforms[i].name = strdup(uniforms[i].name);
         render_mesh.uniforms[i].type = type;
         render_mesh.uniforms[i].num = uniforms[i].num;
         render_mesh.uniforms[i].data = calloc(1,size);
@@ -778,7 +778,7 @@ int load_custom_mesh_from_memory(int num_verts, int num_tris,
 		struct CustomMeshDataSpec spec = data_spec[i];
 		total_data_len += uniform_sizes[spec.type]*num_verts;
 	}
-    float *vertex_data=calloc(total_data_len,1);
+    unsigned char *vertex_data=calloc(total_data_len,1);
 	unsigned char *vd = vertex_data;
 	for (int i = 0; i < num_data_specs; i++) {
 		struct CustomMeshDataSpec spec = data_spec[i];
@@ -1711,32 +1711,15 @@ struct Color color_black = { 0.f,0.f,0.f,1.f };
 
 struct Matrix3 multiply_matrix3(struct Matrix3 A, struct Matrix3 B)
 {
-    if((0)){
-        struct Matrix3 avx_ret={0};
-        const __m256i idx_a = _mm256_setr_epi32(0,0,0,3,3,3,6,6);
-        const __m256i idx_b = _mm256_setr_epi32(0,1,2,0,1,2,0,1);
-        __m256 c = _mm256_setzero_ps();
-        for(int i=0;i<3;i++){
-            __m256 a = _mm256_i32gather_ps(A.m+i  , idx_a, 4);
-            __m256 b = _mm256_i32gather_ps(B.m+i*3, idx_b, 4);
-            c = _mm256_add_ps(c, _mm256_mul_ps(a,b));
-        }
-        _mm256_store_ps(avx_ret.m,c);
-        for(int k=0;k<3;k++){
-            avx_ret.m[2*3+2]+=A.m[2*3+k]*B.m[k*3+2];
-        }
-        return avx_ret;
-    }else{
-        struct Matrix3 ret={0};
-        for(int i=0;i<3;i++){
-            for(int j=0;j<3;j++){
-                for(int k=0;k<3;k++){
-                    ret.m[i*3+j]+=A.m[i*3+k]*B.m[k*3+j];
-                }
-            }
-        }
-        return ret;
-    }
+	struct Matrix3 ret={0};
+	for(int i=0;i<3;i++){
+	    for(int j=0;j<3;j++){
+		for(int k=0;k<3;k++){
+		    ret.m[i*3+j]+=A.m[i*3+k]*B.m[k*3+j];
+		}
+	    }
+	}
+	return ret;
 }
 
 struct Matrix3 get_rotation_matrix3(float x,float y,float z)

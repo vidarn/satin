@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "compiler_features/compiler_features.h"
 struct GameData;
 struct InputState;
 struct RenderContext;
@@ -14,7 +15,7 @@ struct Vec2{
 // [ 0  1  2]
 // [ 3  4  5]
 // [ 6  7  8]
-struct _declspec(align(32)) Matrix3{
+struct ALIGNED_(32) Matrix3 {
     float m[9];
 };
 #define M3(mat,x,y) mat.m[x*3+y]
