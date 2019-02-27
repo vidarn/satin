@@ -1101,6 +1101,9 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
     sd->h = sprite_h;
     sd->data = calloc(sd->w * sd->h, 4*sizeof(char));
     memcpy(sd->data,sprite_data,sd->w*sd->h*4);
+    sd->should_be_packed = 1;
+
+    printf("Loaded sprite of size %dx%d\n", sprite_w, sprite_h);
 
     return ret;
 }
@@ -1210,10 +1213,10 @@ int load_font(const char *name, double font_size, struct GameData *data)
 void create_sprite_atlas(struct GameData *data)
 {
     int pad = 1;
-    //printf("Creating atlas\n");
+    printf("Creating atlas\n");
     //TODO(Vidar):We assume that one 2048x2048 texture is enough for now
-    const int w = 4096;
-    const int h = 4096;
+    const int w = 2048;
+    const int h = 2048;
     #define num_nodes 4096
     stbrp_node nodes[num_nodes];
     stbrp_context context;
@@ -1223,8 +1226,8 @@ void create_sprite_atlas(struct GameData *data)
     struct SpriteData *sprite_data = data->sprite_data;
     for(int i=0;i<data->num_sprites;i++){
 		if (sprite_data->should_be_packed) {
-			//printf("packing sprite %d of size %dx%d\n",i,sprite_data->w,
-				//sprite_data->h);
+			printf("packing sprite %d of size %dx%d\n",i,sprite_data->w,
+				sprite_data->h);
 			rects[i].id = i;
 			rects[i].w = sprite_data->w + pad * 2;
 			rects[i].h = sprite_data->h + pad * 2;
@@ -1232,16 +1235,17 @@ void create_sprite_atlas(struct GameData *data)
         sprite_data++;
     }
     int status = stbrp_pack_rects(&context,rects,data->num_sprites);
-    //printf("Packing status: %d\n",status);
+    printf("Packing status: %d\n",status);
     unsigned char *atlas_data = (unsigned char *)calloc(w*h,4);
     sprite_data = data->sprite_data;
     struct Sprite *sprite = data->sprites;
     float inv_w = 1.f/(float)w;
     float inv_h = 1.f/(float)h;
     for(int i=0;i<data->num_sprites;i++){
+	    printf("Sprite %d\n");
 		if (sprite_data->should_be_packed) {
 			if (rects[i].was_packed) {
-				//printf("Sprite %d was packed\n",i);
+				printf("Sprite %d was packed\n",i);
 				int x_offset = rects[i].x + pad;
 				int y_offset = rects[i].y + pad;
 				sprite_data->x = x_offset;
@@ -1282,11 +1286,11 @@ void create_sprite_atlas(struct GameData *data)
         sprite_data++;
         sprite++;
     }
-    //printf("Atlas created\n");
+    printf("Atlas created\n");
     //DEBUG(Vidar):Write atlas to image
 #if 0
-    stbi_write_png("atlas.png",w,h,4,atlas_data,0);
-    //printf("Atlas written to file\n");
+    stbi_write_png("/tmp/atlas.png",w,h,4,atlas_data,0);
+    printf("Atlas written to file\n");
 #endif
 }
 
@@ -1573,7 +1577,7 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     struct GameData *data = calloc(1,sizeof(struct GameData));
 	set_os_data(os_data,data);
 	data->debug_mode = debug_mode;
-    data->sprite_shader = load_shader("sprite", "sprite", data, "pos", "uv",(char*)0);
+    data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
 
     data->line_shader = load_shader("line", "line" , data, "pos", (char*)0);
 
@@ -2475,8 +2479,8 @@ void process_uniforms(int shader, int num_uniforms,
         struct ShaderUniform u = uniforms[j];
         int loc=glGetUniformLocation(shader,u.name);
         if(loc == -1){
-            //printf("Warning: Could not find \"%s\" uniform in shader\n",
-                //u.name);
+            printf("Warning: Could not find \"%s\" uniform in shader\n",
+                u.name);
         }else{
             switch(u.type){
                 case SHADER_UNIFORM_INT:
@@ -2519,6 +2523,11 @@ void process_uniforms(int shader, int num_uniforms,
                         int sprite_id = *(int*)u.data;
                         sprite = data->sprites + sprite_id;
                     }
+		    /*
+		    printf("rendering sprite %f %f %f %f\n",
+			    sprite->uv_offset[0], sprite->uv_offset[1],
+			    sprite->uv_size[0], sprite->uv_size[1]);
+			    */
                     glUniform1i(loc, num_textures);
                     glActiveTexture(GL_TEXTURE0 + num_textures);
                     glBindTexture(GL_TEXTURE_2D,

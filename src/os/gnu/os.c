@@ -16,12 +16,27 @@ void os_data_set_data_folder_name(void *os_data, char *path)
 {
 }
 
+#include <unistd.h>
+#include <sys/stat.h>
+#include <libgen.h>
+
 FILE *open_file(const char *filename,const char *extension,const char *mode, struct GameData *data)
 {
-	const char *base_path = "/home/pi/code/material_scanner_server/scanner_app/deps/satin/data/";
-	size_t len = strlen(base_path) + strlen(filename) + strlen(extension) + 16;
+	//NOTE(Vidar):We assume 1024 chars is enough
+	char exe_path[1024];
+	ssize_t read_bytes = readlink("/proc/self/exe", exe_path, 1024);
+	if(read_bytes<0){
+		printf("Error, could not read /proc/self/exe\n");
+		return 0;
+	}
+
+	exe_path[read_bytes] = 0;
+	char *base_path = dirname(exe_path);
+
+	//const char *base_path = "/home/pi/code/material_scanner_server/scanner_app/deps/satin/data/";
+	size_t len = strlen(base_path) + strlen(filename) + strlen(extension) + 32;
 	char *path = calloc(len,1);
-	sprintf(path,"%s%s%s",base_path,filename,extension);
+	sprintf(path,"%s/data/%s%s",base_path,filename,extension);
 	printf("Opening file %s\n", path);
 	FILE *fp = fopen(path, mode);
 	free(path);
@@ -105,6 +120,16 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 	XStoreName(display, window, window_title);
 
 	GLXContext glx_context = glXCreateContext(display, visual_info, 0 , GL_TRUE);
+	/*
+	int context_attribs[] = {
+		GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
+		GLX_CONTEXT_MINOR_VERSION_ARB, 3,
+		None
+	};
+	GLXContext glx_context =
+		glXCreateContextAttribsARB(display, visual_info, 0, GL_TRUE,
+		context_attribs);
+	*/
 	glXMakeCurrent(display, window, glx_context);
 
 	opengl_load();

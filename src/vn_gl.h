@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include "os/os.h"
+
+#define SATIN_SHADER_SUFFIX ""
 #ifdef __APPLE__
     #include "TargetConditionals.h"
     #if TARGET_OS_IPHONE
@@ -32,7 +34,9 @@ static const char *glsl_version_string = "#version 330\n";
 #endif
 #if defined(__GNUC__)
 	#include "opengl_gnu.h"
-    static const char *glsl_version_string = "#version 330\n";
+    static const char *glsl_version_string = "#version 120\n";
+#undef SATIN_SHADER_SUFFIX
+#define SATIN_SHADER_SUFFIX "_120"
 #endif
 static GLint check_compilation(GLuint handle,GLenum flag,
 	char *error_buffer,size_t error_buffer_len,const char *name)
