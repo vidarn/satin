@@ -1,7 +1,9 @@
 #pragma once
-#include <GL/gl.h>
 #ifdef WIN32
 #include <Windows.h>
+#endif
+#include <GL/gl.h>
+#ifdef WIN32
 #include "wgl.h"
 #include "glext.h"
 #endif
