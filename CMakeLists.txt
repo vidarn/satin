@@ -23,6 +23,7 @@ if(UNIX)
 	)
 	set(SATIN_OS_LIBS
 		m
+		X11
 	)
 endif(UNIX)
 set(SATIN_SRC
