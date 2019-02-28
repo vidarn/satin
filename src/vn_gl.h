@@ -33,7 +33,7 @@ static const char *glsl_version_string = "#version 330\n";
     //#include <GL/glext.h>
 #endif
 #if defined(__GNUC__)
-	#include "opengl_gnu.h"
+	#include "opengl.h"
     static const char *glsl_version_string = "#version 120\n";
 #undef SATIN_SHADER_SUFFIX
 #define SATIN_SHADER_SUFFIX "_120"
