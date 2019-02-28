@@ -88,7 +88,6 @@ int atomic_increment_int32(int *a) {
 void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h, int show_console, 
 	int num_game_states, void *param, struct GameState *game_states, int debug_mode)
 {
-	struct InputState input_state = {0};
 	Display *display = XOpenDisplay(0);
 	if(!display){
 		printf("Error! Could not connect to X server\n");
@@ -118,6 +117,8 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 	printf("Created window\n");
 	XMapWindow(display, window);
 	XStoreName(display, window, window_title);
+	//XGrabPointer(display, root_window, 0, ButtonPressMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+	XSelectInput(display, window, ButtonPressMask);
 
 	GLXContext glx_context = glXCreateContext(display, visual_info, 0 , GL_TRUE);
 	/*
@@ -134,31 +135,67 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 
 	opengl_load();
 
+	//glXSwapIntervalMESA(1);
+
 	struct GNUData* os_data = os_data_create();
 	struct GameData* game_data = init(num_game_states, game_states, param, &os_data, debug_mode);
 
 
 	while(1){
-		XEvent event;
-		XNextEvent(display , &event);
-		
-		if(event.type == Expose) {
-			XWindowAttributes window_attributes;
-			XGetWindowAttributes(display, window, &window_attributes);
-			glViewport(0, 0, window_attributes.width, window_attributes.height);
-			//TODO(Vidar): Report correct delta time
-			update(0, input_state, game_data);
-			render(framebuffer_w, framebuffer_h, game_data);
-			glXSwapBuffers(display, window);
-		}
+		struct InputState input_state = {0};
+		if(XPending(display) > 0){
+			XEvent event;
+			XNextEvent(display , &event);
 			
-		else if(event.type == KeyPress) {
-			glXMakeCurrent(display, None, NULL);
-			glXDestroyContext(display, glx_context);
-			XDestroyWindow(display, window);
-			XCloseDisplay(display);
-			exit(0);
+			switch(event.type){
+			case Expose:
+			{
+				XWindowAttributes window_attributes;
+				XGetWindowAttributes(display, window, &window_attributes);
+				glViewport(0, 0, window_attributes.width, window_attributes.height);
+				break;
+			}
+				
+			case KeyPress:
+			{
+				glXMakeCurrent(display, None, NULL);
+				glXDestroyContext(display, glx_context);
+				XDestroyWindow(display, window);
+				XCloseDisplay(display);
+				exit(0);
+				break;
+			}
+			case ButtonPress:
+			{
+
+				XButtonEvent button_event = *(XButtonEvent*)&event;
+				float p_x = (float)button_event.x;
+				float p_y = (float)button_event.y;
+				float m_x,m_y;
+
+				float w = (float)framebuffer_w;
+				float h = (float)framebuffer_h;
+				if (w<h) {
+					m_x = p_x / w;
+					m_y = 1.f - (p_y / w - 0.5*(h - w) / w);
+				}
+				else {
+					m_x = p_x / h - 0.5f*(w - h) / h;
+					m_y = 1.f - p_y / h;
+				}
+				input_state.mouse_x = m_x;
+				input_state.mouse_y = m_y;
+
+				input_state.mouse_state = MOUSE_CLICKED;
+				printf("Button press! %f %f\n", input_state.mouse_x, input_state.mouse_y);
+				break;
+			}
+			}
 		}
+		//TODO(Vidar): Report correct delta time
+		update(0, input_state, game_data);
+		render(framebuffer_w, framebuffer_h, game_data);
+		glXSwapBuffers(display, window);
 	}
 	end_game(game_data);
 
