@@ -1664,11 +1664,13 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 		data->game_states[0].init(data, param, -1);
 
 		data->active_game_state = -1;
+		/*
 		for (int i = 1; i < data->num_game_state_types; i++) {
 			struct GameState tmp_game_state = data->game_state_types[i];
 			tmp_game_state.init(data, 0, -1);
 			tmp_game_state.destroy(data);
 		}
+		*/
 		data->active_game_state = 0;
 	}
 
