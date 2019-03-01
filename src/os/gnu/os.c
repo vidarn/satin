@@ -197,6 +197,7 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 		//TODO(Vidar): Report correct delta time
 		wait_for_event = update(0, input_state, game_data);
 		render(framebuffer_w, framebuffer_h, game_data);
+		glFinish();
 		glXSwapBuffers(display, window);
 	}
 	end_game(game_data);
