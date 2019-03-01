@@ -2796,7 +2796,7 @@ void render(int framebuffer_w, int framebuffer_h, struct GameData *data)
     }
 }
 
-void update(int ticks, struct InputState input_state, struct GameData *data)
+int update(int ticks, struct InputState input_state, struct GameData *data)
 {
     const int num_ticks = sizeof(data->ticks)/sizeof(*data->ticks);
     for(int i=num_ticks-1; i > 0;i--){
@@ -2804,7 +2804,7 @@ void update(int ticks, struct InputState input_state, struct GameData *data)
     }
     data->ticks[0] = ticks;
     data->active_game_state = data->next_game_state;
-    data->game_states[data->active_game_state].update(ticks,input_state,data);
+    int ret = data->game_states[data->active_game_state].update(ticks,input_state,data);
     int state = 0;
     while(state<data->num_game_states){
         if(data->game_states[state].should_destroy){
@@ -2817,6 +2817,7 @@ void update(int ticks, struct InputState input_state, struct GameData *data)
             state++;
         }
     }
+	return ret;
 }
 
 void end_game(struct GameData *data)

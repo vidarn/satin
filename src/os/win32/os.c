@@ -387,8 +387,14 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	long int drag_start_x = 0;
 	long int drag_start_y = 0;
 	int cursor_visible = 1;
+	int wait_for_event = 0;
 	while (!done) {
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+		int event_recieved;
+		if ((event_recieved = PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) || wait_for_event) {
+			wait_for_event = 0;
+			if (!event_recieved) {
+				GetMessageA(&msg, NULL, 0, 0);
+			}
 			switch (msg.message) {
 			case WM_QUIT:
 				done = 1;
@@ -553,7 +559,8 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			last_tick = current_tick;
 			delta_ticks.QuadPart *= TICKS_PER_SECOND;
 			delta_ticks.QuadPart /= counter_frequency.QuadPart;
-			update((int)delta_ticks.QuadPart, input_state, game_data);
+			wait_for_event = update((int)delta_ticks.QuadPart, input_state, game_data);
+			printf("Update!\n");
 			render(framebuffer_w, framebuffer_h, game_data);
 			glFlush();
 			SwapBuffers(hDC);

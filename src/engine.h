@@ -41,7 +41,7 @@ struct Vec4{
 };
 
 struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data, int debug_mode);
-void update(int ticks, struct InputState input_state, struct GameData *data);
+int update(int ticks, struct InputState input_state, struct GameData *data);
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data);
 void end_game(struct GameData *data);
 #define TICKS_PER_SECOND 1000000
@@ -337,7 +337,7 @@ struct RenderContext
 
 
 struct GameState {
-    void (*update)(int ticks, struct InputState input_state,
+    int (*update)(int ticks, struct InputState input_state,
         struct GameData *data);
     void (*init)(struct GameData *data, void *argument, int parent_state);
     void (*destroy)(struct GameData *data);

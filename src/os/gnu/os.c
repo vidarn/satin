@@ -141,9 +141,11 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 	struct GameData* game_data = init(num_game_states, game_states, param, &os_data, debug_mode);
 
 
+	int wait_for_event = 0;
 	while(1){
 		struct InputState input_state = {0};
-		if(XPending(display) > 0){
+		while(XPending(display) > 0 || wait_for_event){
+			wait_for_event = 0;
 			XEvent event;
 			XNextEvent(display , &event);
 			
@@ -193,7 +195,7 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 			}
 		}
 		//TODO(Vidar): Report correct delta time
-		update(0, input_state, game_data);
+		wait_for_event = update(0, input_state, game_data);
 		render(framebuffer_w, framebuffer_h, game_data);
 		glXSwapBuffers(display, window);
 	}
