@@ -560,7 +560,6 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			delta_ticks.QuadPart *= TICKS_PER_SECOND;
 			delta_ticks.QuadPart /= counter_frequency.QuadPart;
 			wait_for_event = update((int)delta_ticks.QuadPart, input_state, game_data);
-			printf("Update!\n");
 			render(framebuffer_w, framebuffer_h, game_data);
 			glFlush();
 			SwapBuffers(hDC);

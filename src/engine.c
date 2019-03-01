@@ -1213,7 +1213,7 @@ int load_font(const char *name, double font_size, struct GameData *data)
 void create_sprite_atlas(struct GameData *data)
 {
     int pad = 1;
-    printf("Creating atlas\n");
+    //printf("Creating atlas\n");
     //TODO(Vidar):We assume that one 2048x2048 texture is enough for now
     const int w = 2048;
     const int h = 2048;
@@ -1226,8 +1226,8 @@ void create_sprite_atlas(struct GameData *data)
     struct SpriteData *sprite_data = data->sprite_data;
     for(int i=0;i<data->num_sprites;i++){
 		if (sprite_data->should_be_packed) {
-			printf("packing sprite %d of size %dx%d\n",i,sprite_data->w,
-				sprite_data->h);
+			//printf("packing sprite %d of size %dx%d\n",i,sprite_data->w,
+				//sprite_data->h);
 			rects[i].id = i;
 			rects[i].w = sprite_data->w + pad * 2;
 			rects[i].h = sprite_data->h + pad * 2;
@@ -1235,17 +1235,16 @@ void create_sprite_atlas(struct GameData *data)
         sprite_data++;
     }
     int status = stbrp_pack_rects(&context,rects,data->num_sprites);
-    printf("Packing status: %d\n",status);
+    //printf("Packing status: %d\n",status);
     unsigned char *atlas_data = (unsigned char *)calloc(w*h,4);
     sprite_data = data->sprite_data;
     struct Sprite *sprite = data->sprites;
     float inv_w = 1.f/(float)w;
     float inv_h = 1.f/(float)h;
     for(int i=0;i<data->num_sprites;i++){
-	    printf("Sprite %d\n");
 		if (sprite_data->should_be_packed) {
 			if (rects[i].was_packed) {
-				printf("Sprite %d was packed\n",i);
+				//printf("Sprite %d was packed\n",i);
 				int x_offset = rects[i].x + pad;
 				int y_offset = rects[i].y + pad;
 				sprite_data->x = x_offset;
@@ -1270,7 +1269,7 @@ void create_sprite_atlas(struct GameData *data)
 				sprite->uv_size[1] = sprite->width*sprite->inv_aspect*inv_h;
 			}
 			else {
-				printf("Sprite %d was not packed\n", i);
+				//printf("Sprite %d was not packed\n", i);
 			}
 		}
         sprite_data++;
@@ -1286,7 +1285,7 @@ void create_sprite_atlas(struct GameData *data)
         sprite_data++;
         sprite++;
     }
-    printf("Atlas created\n");
+    //printf("Atlas created\n");
     //DEBUG(Vidar):Write atlas to image
 #if 0
     stbi_write_png("/tmp/atlas.png",w,h,4,atlas_data,0);
