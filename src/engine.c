@@ -288,7 +288,7 @@ float get_string_render_width(int font_id, const char *text, int len,
 {
     struct Font *font = data->fonts + font_id;
     float ret = 0.f;
-    for(int i=0; i<len; i++){
+    for(int i=0; i<len || (len==-1 && text[i] != 0); i++){
         stbtt_aligned_quad quad = {0};
         float fx = 0.f;
         float fy = 0.f;
