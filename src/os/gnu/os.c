@@ -118,7 +118,7 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 	XMapWindow(display, window);
 	XStoreName(display, window, window_title);
 	//XGrabPointer(display, root_window, 0, ButtonPressMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
-	XSelectInput(display, window, ButtonPressMask);
+	XSelectInput(display, window, ButtonPressMask|ButtonReleaseMask);
 
 	GLXContext glx_context = glXCreateContext(display, visual_info, 0 , GL_TRUE);
 	/*
@@ -142,8 +142,8 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 
 
 	int wait_for_event = 0;
+	struct InputState input_state = {0};
 	while(1){
-		struct InputState input_state = {0};
 		while(XPending(display) > 0 || wait_for_event){
 			wait_for_event = 0;
 			XEvent event;
@@ -168,6 +168,7 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 				break;
 			}
 			case ButtonPress:
+			case ButtonRelease:
 			{
 
 				XButtonEvent button_event = *(XButtonEvent*)&event;
@@ -188,14 +189,21 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 				input_state.mouse_x = m_x;
 				input_state.mouse_y = m_y;
 
-				input_state.mouse_state = MOUSE_CLICKED;
-				printf("Button press! %f %f\n", input_state.mouse_x, input_state.mouse_y);
+				if(event.type == ButtonPress){
+					input_state.mouse_state = MOUSE_CLICKED;
+					printf("Button press! %f %f\n", input_state.mouse_x, input_state.mouse_y);
+					input_state.mouse_down = 1;
+				}else{
+					printf("Button release! %f %f\n", input_state.mouse_x, input_state.mouse_y);
+					input_state.mouse_down = 0;
+				}
 				break;
 			}
 			}
 		}
 		//TODO(Vidar): Report correct delta time
 		wait_for_event = update(0, input_state, game_data);
+		input_state.mouse_state = MOUSE_NOTHING;
 		render(framebuffer_w, framebuffer_h, game_data);
 		glFinish();
 		glXSwapBuffers(display, window);

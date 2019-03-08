@@ -1578,7 +1578,7 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 	data->debug_mode = debug_mode;
     data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
 
-    data->line_shader = load_shader("line", "line" , data, "pos", (char*)0);
+    data->line_shader = load_shader("line" SATIN_SHADER_SUFFIX, "line" SATIN_SHADER_SUFFIX , data, "pos", (char*)0);
 
     data->num_game_state_types = num_game_states;
     data->game_state_types = calloc(num_game_states,sizeof(struct GameState));
