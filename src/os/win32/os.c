@@ -370,7 +370,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	ShowWindow(hWnd, SW_SHOW);
 
 	struct Win32Data* os_data = os_data_create();
-	struct GameData* game_data = init(num_game_states, game_states, param, &os_data, debug_mode);
+	struct GameData* game_data = init(num_game_states, game_states, param, os_data, debug_mode);
 
 	HANDLE timer = CreateWaitableTimerA(NULL, TRUE, "Engine FPS timer");
 	if (!timer) {
