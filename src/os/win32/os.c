@@ -387,8 +387,14 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	long int drag_start_x = 0;
 	long int drag_start_y = 0;
 	int cursor_visible = 1;
+	int wait_for_event = 0;
 	while (!done) {
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+		int event_recieved;
+		if ((event_recieved = PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) || wait_for_event) {
+			wait_for_event = 0;
+			if (!event_recieved) {
+				GetMessageA(&msg, NULL, 0, 0);
+			}
 			switch (msg.message) {
 			case WM_QUIT:
 				done = 1;
@@ -436,9 +442,12 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			{
 				input_state.mouse_state = MOUSE_CLICKED;
 				input_state.mouse_down = 1;
-				POINTS tmp = MAKEPOINTS(msg.lParam);
-				drag_start_x = tmp.x;
-				drag_start_y = tmp.y;
+				//POINTS tmp = MAKEPOINTS(msg.lParam);
+				POINT p;
+				GetCursorPos(&p);
+				ScreenToClient(hWnd, &p);
+				drag_start_x = p.x;
+				drag_start_y = p.y;
 				break;
 			}
 			case WM_LBUTTONUP:
@@ -536,8 +545,8 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				float dx = fabsf(input_state.drag_start_x - input_state.mouse_x);
 				float dy = fabsf(input_state.drag_start_y - input_state.mouse_y);
 				//printf("%f %f, %f %f\n",input_state.mouse_x,input_state.mouse_y,input_state.drag_start_x,input_state.drag_start_y);
-				float drag_dx = (float)GetSystemMetrics(SM_CXDRAG) / (float)(r.right - r.left);
-				float drag_dy = (float)GetSystemMetrics(SM_CYDRAG) / (float)(r.top - r.bottom);
+				float drag_dx = fabsf((float)GetSystemMetrics(SM_CXDRAG) / (float)(r.right - r.left));
+				float drag_dy = fabsf((float)GetSystemMetrics(SM_CYDRAG) / (float)(r.top - r.bottom));
 				if (dx>drag_dx || dy>drag_dy) {
 					input_state.mouse_state = MOUSE_DRAG;
 				}
@@ -550,7 +559,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			last_tick = current_tick;
 			delta_ticks.QuadPart *= TICKS_PER_SECOND;
 			delta_ticks.QuadPart /= counter_frequency.QuadPart;
-			update((int)delta_ticks.QuadPart, input_state, game_data);
+			wait_for_event = update((int)delta_ticks.QuadPart, input_state, game_data);
 			render(framebuffer_w, framebuffer_h, game_data);
 			glFlush();
 			SwapBuffers(hDC);

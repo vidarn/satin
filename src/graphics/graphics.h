@@ -1,4 +1,5 @@
 #pragma once
+#include "compiler_features/compiler_features.h"
 struct FrameData;
 
 struct Sprite;
@@ -39,7 +40,7 @@ struct RenderQuad{
     struct ShaderUniform *uniforms;
 	//NOTE(Vidar):This is a matrix3
 	//TODO(Vidar):Handle this better
-    float _declspec(align(32)) m[9];
+    float ALIGNED_(32) m[9];
 	float pad[7];
     int num_uniforms;
     int shader;

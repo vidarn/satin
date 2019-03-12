@@ -21,7 +21,7 @@
 #include "graphics/graphics.h"
 #include "sort/sort.h"
 
-#include <immintrin.h>
+//#include <immintrin.h>
 
 static const int uniform_sizes[] = {
 #define SHADER_UNIFORM_TYPE(name,num,size,gl_type) num*size,
@@ -163,7 +163,7 @@ void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
     for(int i=0;i<num_uniforms;i++){
         enum ShaderUniformType type = uniforms[i].type;
         int size = uniform_sizes[type]*uniforms[i].num;
-        r->uniforms[i].name = _strdup(uniforms[i].name);
+        r->uniforms[i].name = strdup(uniforms[i].name);
         r->uniforms[i].type = type;
         r->uniforms[i].num  = uniforms[i].num;
         r->uniforms[i].data = calloc(1,size);
@@ -288,7 +288,7 @@ float get_string_render_width(int font_id, const char *text, int len,
 {
     struct Font *font = data->fonts + font_id;
     float ret = 0.f;
-    for(int i=0; i<len; i++){
+    for(int i=0; i<len || (len==-1 && text[i] != 0); i++){
         stbtt_aligned_quad quad = {0};
         float fx = 0.f;
         float fy = 0.f;
@@ -306,7 +306,7 @@ void render_string_screen_fancy(const char *string, int font_id, float *x, float
     {
         //TODO(Vidar):Actually use this???
         struct RenderString rs = {0};
-        rs.str = _strdup(string);
+        rs.str = strdup(string);
         rs.font = font_id;
         rs.x = 2.f*(context->w*(*x) + context->offset_x)-1.f;
         rs.y = 2.f*(context->h*(*y) + context->offset_y)-1.f;
@@ -421,7 +421,7 @@ void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUnifor
     for(int i=0;i<num_uniforms;i++){
         enum ShaderUniformType type = uniforms[i].type;
         int size = uniform_sizes[type]*uniforms[i].num;
-        render_mesh.uniforms[i].name = _strdup(uniforms[i].name);
+        render_mesh.uniforms[i].name = strdup(uniforms[i].name);
         render_mesh.uniforms[i].type = type;
         render_mesh.uniforms[i].num = uniforms[i].num;
         render_mesh.uniforms[i].data = calloc(1,size);
@@ -778,7 +778,7 @@ int load_custom_mesh_from_memory(int num_verts, int num_tris,
 		struct CustomMeshDataSpec spec = data_spec[i];
 		total_data_len += uniform_sizes[spec.type]*num_verts;
 	}
-    float *vertex_data=calloc(total_data_len,1);
+    unsigned char *vertex_data=calloc(total_data_len,1);
 	unsigned char *vd = vertex_data;
 	for (int i = 0; i < num_data_specs; i++) {
 		struct CustomMeshDataSpec spec = data_spec[i];
@@ -1101,6 +1101,9 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
     sd->h = sprite_h;
     sd->data = calloc(sd->w * sd->h, 4*sizeof(char));
     memcpy(sd->data,sprite_data,sd->w*sd->h*4);
+    sd->should_be_packed = 1;
+
+    printf("Loaded sprite of size %dx%d\n", sprite_w, sprite_h);
 
     return ret;
 }
@@ -1212,8 +1215,8 @@ void create_sprite_atlas(struct GameData *data)
     int pad = 1;
     //printf("Creating atlas\n");
     //TODO(Vidar):We assume that one 2048x2048 texture is enough for now
-    const int w = 4096;
-    const int h = 4096;
+    const int w = 2048;
+    const int h = 2048;
     #define num_nodes 4096
     stbrp_node nodes[num_nodes];
     stbrp_context context;
@@ -1266,7 +1269,7 @@ void create_sprite_atlas(struct GameData *data)
 				sprite->uv_size[1] = sprite->width*sprite->inv_aspect*inv_h;
 			}
 			else {
-				printf("Sprite %d was not packed\n", i);
+				//printf("Sprite %d was not packed\n", i);
 			}
 		}
         sprite_data++;
@@ -1285,8 +1288,8 @@ void create_sprite_atlas(struct GameData *data)
     //printf("Atlas created\n");
     //DEBUG(Vidar):Write atlas to image
 #if 0
-    stbi_write_png("atlas.png",w,h,4,atlas_data,0);
-    //printf("Atlas written to file\n");
+    stbi_write_png("/tmp/atlas.png",w,h,4,atlas_data,0);
+    printf("Atlas written to file\n");
 #endif
 }
 
@@ -1573,9 +1576,9 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     struct GameData *data = calloc(1,sizeof(struct GameData));
 	set_os_data(os_data,data);
 	data->debug_mode = debug_mode;
-    data->sprite_shader = load_shader("sprite", "sprite", data, "pos", "uv",(char*)0);
+    data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
 
-    data->line_shader = load_shader("line", "line" , data, "pos", (char*)0);
+    data->line_shader = load_shader("line" SATIN_SHADER_SUFFIX, "line" SATIN_SHADER_SUFFIX , data, "pos", (char*)0);
 
     data->num_game_state_types = num_game_states;
     data->game_state_types = calloc(num_game_states,sizeof(struct GameState));
@@ -1660,11 +1663,13 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 		data->game_states[0].init(data, param, -1);
 
 		data->active_game_state = -1;
+		/*
 		for (int i = 1; i < data->num_game_state_types; i++) {
 			struct GameState tmp_game_state = data->game_state_types[i];
 			tmp_game_state.init(data, 0, -1);
 			tmp_game_state.destroy(data);
 		}
+		*/
 		data->active_game_state = 0;
 	}
 
@@ -1711,32 +1716,15 @@ struct Color color_black = { 0.f,0.f,0.f,1.f };
 
 struct Matrix3 multiply_matrix3(struct Matrix3 A, struct Matrix3 B)
 {
-    if((0)){
-        struct Matrix3 avx_ret={0};
-        const __m256i idx_a = _mm256_setr_epi32(0,0,0,3,3,3,6,6);
-        const __m256i idx_b = _mm256_setr_epi32(0,1,2,0,1,2,0,1);
-        __m256 c = _mm256_setzero_ps();
-        for(int i=0;i<3;i++){
-            __m256 a = _mm256_i32gather_ps(A.m+i  , idx_a, 4);
-            __m256 b = _mm256_i32gather_ps(B.m+i*3, idx_b, 4);
-            c = _mm256_add_ps(c, _mm256_mul_ps(a,b));
-        }
-        _mm256_store_ps(avx_ret.m,c);
-        for(int k=0;k<3;k++){
-            avx_ret.m[2*3+2]+=A.m[2*3+k]*B.m[k*3+2];
-        }
-        return avx_ret;
-    }else{
-        struct Matrix3 ret={0};
-        for(int i=0;i<3;i++){
-            for(int j=0;j<3;j++){
-                for(int k=0;k<3;k++){
-                    ret.m[i*3+j]+=A.m[i*3+k]*B.m[k*3+j];
-                }
-            }
-        }
-        return ret;
-    }
+	struct Matrix3 ret={0};
+	for(int i=0;i<3;i++){
+	    for(int j=0;j<3;j++){
+		for(int k=0;k<3;k++){
+		    ret.m[i*3+j]+=A.m[i*3+k]*B.m[k*3+j];
+		}
+	    }
+	}
+	return ret;
 }
 
 struct Matrix3 get_rotation_matrix3(float x,float y,float z)
@@ -2492,8 +2480,8 @@ void process_uniforms(int shader, int num_uniforms,
         struct ShaderUniform u = uniforms[j];
         int loc=glGetUniformLocation(shader,u.name);
         if(loc == -1){
-            //printf("Warning: Could not find \"%s\" uniform in shader\n",
-                //u.name);
+            printf("Warning: Could not find \"%s\" uniform in shader\n",
+                u.name);
         }else{
             switch(u.type){
                 case SHADER_UNIFORM_INT:
@@ -2536,6 +2524,11 @@ void process_uniforms(int shader, int num_uniforms,
                         int sprite_id = *(int*)u.data;
                         sprite = data->sprites + sprite_id;
                     }
+		    /*
+		    printf("rendering sprite %f %f %f %f\n",
+			    sprite->uv_offset[0], sprite->uv_offset[1],
+			    sprite->uv_size[0], sprite->uv_size[1]);
+			    */
                     glUniform1i(loc, num_textures);
                     glActiveTexture(GL_TEXTURE0 + num_textures);
                     glBindTexture(GL_TEXTURE_2D,
@@ -2802,7 +2795,7 @@ void render(int framebuffer_w, int framebuffer_h, struct GameData *data)
     }
 }
 
-void update(int ticks, struct InputState input_state, struct GameData *data)
+int update(int ticks, struct InputState input_state, struct GameData *data)
 {
     const int num_ticks = sizeof(data->ticks)/sizeof(*data->ticks);
     for(int i=num_ticks-1; i > 0;i--){
@@ -2810,7 +2803,7 @@ void update(int ticks, struct InputState input_state, struct GameData *data)
     }
     data->ticks[0] = ticks;
     data->active_game_state = data->next_game_state;
-    data->game_states[data->active_game_state].update(ticks,input_state,data);
+    int ret = data->game_states[data->active_game_state].update(ticks,input_state,data);
     int state = 0;
     while(state<data->num_game_states){
         if(data->game_states[state].should_destroy){
@@ -2823,6 +2816,7 @@ void update(int ticks, struct InputState input_state, struct GameData *data)
             state++;
         }
     }
+	return ret;
 }
 
 void end_game(struct GameData *data)

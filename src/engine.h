@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "compiler_features/compiler_features.h"
 struct GameData;
 struct InputState;
 struct RenderContext;
@@ -14,7 +15,7 @@ struct Vec2{
 // [ 0  1  2]
 // [ 3  4  5]
 // [ 6  7  8]
-struct _declspec(align(32)) Matrix3{
+struct ALIGNED_(32) Matrix3 {
     float m[9];
 };
 #define M3(mat,x,y) mat.m[x*3+y]
@@ -40,7 +41,7 @@ struct Vec4{
 };
 
 struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data, int debug_mode);
-void update(int ticks, struct InputState input_state, struct GameData *data);
+int update(int ticks, struct InputState input_state, struct GameData *data);
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data);
 void end_game(struct GameData *data);
 #define TICKS_PER_SECOND 1000000
@@ -336,7 +337,7 @@ struct RenderContext
 
 
 struct GameState {
-    void (*update)(int ticks, struct InputState input_state,
+    int (*update)(int ticks, struct InputState input_state,
         struct GameData *data);
     void (*init)(struct GameData *data, void *argument, int parent_state);
     void (*destroy)(struct GameData *data);
