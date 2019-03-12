@@ -27,7 +27,7 @@ static const char *glsl_version_string = "#version 330\n";
     //#define GLFW_INCLUDE_GLCOREARB
     //#define GL_GLEXT_PROTOTYPES
     //#include <GL/glew.h>
-	#include "opengl.h"
+	#include "opengl/opengl.h"
     //#include <GLFW/glfw3.h>
     static const char *glsl_version_string = "#version 330\n";
     //#include <GL/glext.h>
