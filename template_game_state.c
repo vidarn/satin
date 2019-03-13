@@ -24,7 +24,7 @@ void destroy_template(struct GameData *data)
     free(state_data);
 }
 
-void update_template(int ticks, struct InputState input_state,
+int update_template(int ticks, struct InputState input_state,
                  struct GameData *data)
 {
     state_data = get_custom_data_pointer(data);
@@ -36,6 +36,11 @@ void update_template(int ticks, struct InputState input_state,
     frame_data_reset(state_data->main_frame_data);
     struct Color clear_col = {0.8f,0.8f,0.8f,0.f};
     frame_data_clear(state_data->main_frame_data, clear_col);
+
+	context->camera_2d = get_identity_matrix3();
+	context->camera_3d = get_identity_matrix4();
+
+	return 0;//NOTE(Vidar): Return 1 to wait for input before calling update again (e.g. from a GUI)
 }
 
 struct GameState template_game_state = {

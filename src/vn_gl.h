@@ -27,17 +27,16 @@ static const char *glsl_version_string = "#version 300 es\n";
     //#define GLFW_INCLUDE_GLCOREARB
     //#define GL_GLEXT_PROTOTYPES
     //#include <GL/glew.h>
-	#include "opengl.h"
+	#include "opengl/opengl.h"
     //#include <GLFW/glfw3.h>
     static const char *glsl_version_string = "#version 330\n";
     //#include <GL/glext.h>
 #endif
 #if defined(__GNUC__)
-#ifdef __APPLE__
 	#include "opengl.h"
+#ifdef __APPLE__
     static const char *glsl_version_string = "#version 330\n";
 #else
-	#include "opengl.h"
     static const char *glsl_version_string = "#version 120\n";
 #undef SATIN_SHADER_SUFFIX
 #define SATIN_SHADER_SUFFIX "_120"
