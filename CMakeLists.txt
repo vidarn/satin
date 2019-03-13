@@ -17,14 +17,26 @@ if(WIN32)
 	)
 endif(WIN32)
 if(UNIX)
-	set(SATIN_OS_SRC
-		${SATIN_SRC_DIR}/os/gnu/os.c
-		${SATIN_SRC_DIR}/opengl/gnu/opengl.c
-	)
-	set(SATIN_OS_LIBS
-		m
-		X11
-	)
+    if(APPLE)
+        find_package(GLUT REQUIRED)
+        set(SATIN_OS_SRC
+            ${SATIN_SRC_DIR}/os/osx/os.m
+            ${SATIN_SRC_DIR}/opengl/osx/opengl.c
+        )
+        set(SATIN_OS_LIBS
+            ${GLUT_glut_LIBRARY}
+        )
+        include_directories(${GLUT_INCLUDE_DIR} )
+    else()
+        set(SATIN_OS_SRC
+            ${SATIN_SRC_DIR}/os/gnu/os.c
+            ${SATIN_SRC_DIR}/opengl/gnu/opengl.c
+        )
+        set(SATIN_OS_LIBS
+            m
+            X11
+        )
+    endif(APPLE)
 endif(UNIX)
 set(SATIN_SRC
 	${SATIN_SRC_DIR}/engine.c
@@ -34,6 +46,10 @@ include_directories(${SATIN_SRC_DIR})
 include_directories(${SATIN_SRC_DIR}/opengl)
 
 add_library(satin ${SATIN_SRC} ${VLIB_SRC})
+
+if(APPLE)
+    add_definitions(-DGL_SILENCE_DEPRECATION)
+endif(APPLE)
 
 #target_compile_options(satin PRIVATE /arch:AVX2)
 
