@@ -1,8 +1,14 @@
 #pragma once
+
 #ifdef WIN32
 #include <Windows.h>
 #endif
+
+#ifdef __APPLE__
+#include <OpenGL/gl3.h>
+#else
 #include <GL/gl.h>
+
 #ifdef WIN32
 #include "wgl.h"
 #include "glext.h"
@@ -15,6 +21,7 @@ OPENGL_FUNC(PFNWGLCREATECONTEXTATTRIBSARBPROC, wglCreateContextAttribsARB)
 OPENGL_FUNC(PFNGLACTIVETEXTUREPROC, glActiveTexture)
 #endif
 #undef OPENGL_FUNC
+#endif
 
 void opengl_load(void)
 ;

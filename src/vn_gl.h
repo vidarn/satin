@@ -14,12 +14,12 @@
         #include <OpenGLES/ES3/glext.h>
 static const char *glsl_version_string = "#version 300 es\n";
     #else
-        #define GLFW_INCLUDE_GLCOREARB
+        //#define GLFW_INCLUDE_GLCOREARB
         //NOTE(Vidar):This worked before
         //#include <GLFW/glfw3.h>
-        #include <OpenGL/gl3.h>
+        //#include "opengl.h"
 
-static const char *glsl_version_string = "#version 330\n";
+//static const char *glsl_version_string = "#version 330\n";
     #endif
 #endif
 #ifdef _WIN32
@@ -27,16 +27,20 @@ static const char *glsl_version_string = "#version 330\n";
     //#define GLFW_INCLUDE_GLCOREARB
     //#define GL_GLEXT_PROTOTYPES
     //#include <GL/glew.h>
-	#include "opengl.h"
+	#include "opengl/opengl.h"
     //#include <GLFW/glfw3.h>
     static const char *glsl_version_string = "#version 330\n";
     //#include <GL/glext.h>
 #endif
 #if defined(__GNUC__)
-	#include "opengl/opengl.h"
+	#include "opengl.h"
+#ifdef __APPLE__
+    static const char *glsl_version_string = "#version 330\n";
+#else
     static const char *glsl_version_string = "#version 120\n";
 #undef SATIN_SHADER_SUFFIX
 #define SATIN_SHADER_SUFFIX "_120"
+#endif
 #endif
 static GLint check_compilation(GLuint handle,GLenum flag,
 	char *error_buffer,size_t error_buffer_len,const char *name)

@@ -1,99 +1,123 @@
-#include "os.h"
-#import <Foundation/Foundation.h>
-#import <Cocoa/Cocoa.h>
+#include "os/os.h"
+#include "engine.h"
+#include "glut.h"
+#include <stdio.h>
 
-static NSString * get_file_path_internal(const char *filename,
-    const char *extension)
+#import <Foundation/Foundation.h>
+
+struct OSXData {
+    int i;
+};
+
+char *get_file_path(const char *filename, const char *extension)
 {
+    return 0;
+}
+FILE *open_file(const char *filename, const char *extension, const char *mode, struct GameData *data)
+{
+    NSBundle *main_bundle = [NSBundle mainBundle];
+    if(!main_bundle){
+        printf("Could not load bundle\n");
+    }
     NSString *filename_string = [NSString stringWithUTF8String:filename];
     NSString *extension_string = [NSString stringWithUTF8String:extension];
-#if 0
-    NSBundle *main_bundle = [NSBundle mainBundle];
     NSString *resourcePath = [main_bundle pathForResource:filename_string
-                                                   ofType:extension_string inDirectory:@"data"];
-#else
-    NSString *base_folder= @"/Users/vidarn/Dropbox/skola/masters_thesis/code/data/";
-    NSString *resourcePath = [[base_folder stringByAppendingString:filename_string] stringByAppendingString:extension_string];
-#endif
-    return resourcePath;
-}
-
-FILE *open_file(const char *filename, const char *extension, const char *mode)
-{
-        NSString *path = get_file_path_internal(filename, extension);
-        FILE *fp = fopen([path cStringUsingEncoding:NSUTF8StringEncoding],
-         mode);
+        ofType:extension_string inDirectory:@"data"];
+    FILE *fp = fopen([resourcePath cStringUsingEncoding:NSUTF8StringEncoding], mode);
     return fp;
 }
-
-char* get_file_path(const char *filename, const char *extension)
-{
-    
-    NSString *path = get_file_path_internal(filename, extension);
-    char *ret = strdup([path cStringUsingEncoding:NSUTF8StringEncoding]);
-    return ret;
-}
-
 char *get_save_file_name(const char *title)
 {
-    NSSavePanel *save_panel = [NSSavePanel savePanel];
-    NSString *title_string = [NSString stringWithUTF8String:title];
-    //[save_panel setAllowedFileTypes:@[[NSString stringWithUTF8String:"tikz" ], [NSString stringWithUTF8String:"png" ]]];
-    [save_panel setTitle:title_string];
-    //[save_panel runModal];
-    [save_panel performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
-    //NSURL *url = [save_panel URL];
-    //NSString *url_string = [url path];
-    //const char *c = [url_string UTF8String];
-    const char *c = "AAA";
-    //[save_panel close];
-    return strdup(c);
+    return 0;
 }
-
-
 char *get_open_file_name(const char *title)
 {
-    NSOpenPanel *open_panel = [NSOpenPanel openPanel];
-    NSString *title_string = [NSString stringWithUTF8String:title];
-    [open_panel setAllowedFileTypes:@[[NSString stringWithUTF8String:"png"]]];
-    [open_panel setTitle:title_string];
-    [open_panel runModal];
-    NSURL *url = [open_panel URL];
-    NSString *url_string = [url path];
-    const char *c = [url_string UTF8String];
-    [open_panel close];
-    return strdup(c);
+    return 0;
 }
-
-#include <mach/mach_time.h>
-#include "engine.h"
-static const uint64_t NANOS_PER_USEC = 1000ULL;
-static const uint64_t NANOS_PER_MILLISEC = 1000ULL * NANOS_PER_USEC;
-static const uint64_t NANOS_PER_SEC = 1000ULL * NANOS_PER_MILLISEC;
 uint64_t get_current_tick(void)
 {
-    return mach_absolute_time() * ticks_per_second / NANOS_PER_SEC;
+    return 0;
 }
-
 size_t get_file_len(FILE *fp)
 {
-#ifdef _MSC_VER
-    _fseeki64(fp,0,SEEK_END);
-    size_t f_len = _ftelli64(fp);
-#else
-    fseek(fp,0,SEEK_END);
-    size_t f_len = ftell(fp);
-#endif
-    rewind(fp);
-    return f_len;
+    return 0;
 }
-
-#include <sys/types.h>
-#include <sys/sysctl.h>
 int get_num_cores(void)
 {
-    int count;
-    size_t count_len = sizeof(count);
-    sysctlbyname("hw.logicalcpu", &count, &count_len, NULL, 0);
-    return count;
+    return 0;
 }
+const char *get_computer_name(void)
+{
+    return 0;
+}
+int os_is_key_down(int key)
+{
+    return 0;
+}
+
+int atomic_increment_int32(int *a)
+{
+    return 0;
+}
+
+static struct InputState g_input_state;
+static struct GameData *g_game_data;
+static int g_framebuffer_w;
+static int g_framebuffer_h;
+
+static void display_func(void)
+{
+    if(g_game_data){
+        printf ("Good update\n");
+        update(0,g_input_state, g_game_data);
+        render(g_framebuffer_w, g_framebuffer_h, g_game_data);
+        glutPostRedisplay();
+        glutSwapBuffers();
+    }else{
+        printf("Bad update\n");
+    }
+}
+
+void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console,
+	int num_game_states, void *param, struct GameState *game_states, int debug_mode)
+{
+    printf("Launching game\n");
+
+
+    int num_args = 1;
+    char *args[1] = {""};
+    glutInit(&num_args,args);
+	glutInitDisplayMode(GLUT_3_2_CORE_PROFILE | GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
+	glutInitWindowSize(_framebuffer_w, _framebuffer_h);
+	glutCreateWindow(window_title);
+    glutDisplayFunc(display_func);
+
+    g_game_data = 0;
+
+	struct OSXData *os_data = os_data_create();
+	struct GameData *game_data = init(num_game_states, game_states, param, os_data, debug_mode);
+    g_game_data = game_data;
+    struct InputState input_state= {0};
+    g_input_state = input_state;
+    g_framebuffer_w = _framebuffer_w;
+    g_framebuffer_h = _framebuffer_h;
+
+    glutMainLoop();
+}
+
+void *os_data_create(void)
+{
+    return 0;
+}
+void os_data_set_data_folder_name(void *os_data, char *path)
+{
+}
+char **get_args(int *argc)
+{
+    return 0;
+}
+char *get_cwd()
+{
+    return 0;
+}
+
