@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "timer/timer.h"
+
 struct GNUData {
     //WCHAR data_base_path[_SATIN_OPEN_FILE_MAX_PATH_LEN];
 };
@@ -202,11 +204,17 @@ void launch_game(const char *window_title, int framebuffer_w, int framebuffer_h,
 			}
 		}
 		//TODO(Vidar): Report correct delta time
+        timer_session_set_state_g("update");
 		wait_for_event = update(0, input_state, game_data);
 		input_state.mouse_state = MOUSE_NOTHING;
+        timer_session_set_state_g("render");
 		render(framebuffer_w, framebuffer_h, game_data);
+        timer_session_set_state_g("glFinish");
 		glFinish();
+        timer_session_set_state_g("glXSwapBuffers");
 		glXSwapBuffers(display, window);
+        //timer_session_print_g();
+        timer_session_clear_g();
 	}
 	end_game(game_data);
 

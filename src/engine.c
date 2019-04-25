@@ -269,7 +269,7 @@ void render_string_screen(const char *string, int font, float *x, float *y,
     render_string_screen_n(string,len,font,x,y,color,context);
 }
 
-void printf_screen(char *format, int font, float x, float y,
+void printf_screen(const char *format, int font, float x, float y,
     struct Color color, struct RenderContext *context, ...)
 {
     va_list args;

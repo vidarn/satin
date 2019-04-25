@@ -150,7 +150,7 @@ struct Vec3 cross_vec3(struct Vec3 a, struct Vec3 b);
 void get_sprite_size(int sprite, float *w, float *h, struct GameData *data);
 struct Matrix3 get_sprite_matrix(int sprite, struct GameData *data);
 
-void printf_screen(char *format, int font, float x, float y,
+void printf_screen(const char *format, int font, float x, float y,
     struct Color color, struct RenderContext *context, ...);
 void render_string_screen_n(const char *string, int n, int font, float *x,
     float *y, struct Color color, struct RenderContext *context);
