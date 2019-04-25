@@ -33,7 +33,7 @@ static const char *glsl_version_string = "#version 300 es\n";
     //#include <GL/glext.h>
 #endif
 #if defined(__GNUC__)
-	#include "opengl.h"
+	#include "opengl/opengl.h"
 #ifdef __APPLE__
     static const char *glsl_version_string = "#version 330\n";
 #else
