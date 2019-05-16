@@ -15,6 +15,8 @@ int get_num_cores(void);
 const char *get_computer_name(void);
 int os_is_key_down(int key);
 
+extern char os_folder_separator;
+
 int atomic_increment_int32(int *a);
 
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console,

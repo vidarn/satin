@@ -12,6 +12,8 @@ struct Win32Data {
     WCHAR data_base_path[_SATIN_OPEN_FILE_MAX_PATH_LEN];
 };
 
+char os_folder_separator = '\\';
+
 static void set_data_base_path(struct Win32Data *os_data, WCHAR *data_folder_name)
 {
     HMODULE hModule = NULL;
