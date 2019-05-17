@@ -40,6 +40,7 @@ if(UNIX)
 endif(UNIX)
 set(SATIN_SRC
 	${SATIN_SRC_DIR}/engine.c
+	${SATIN_SRC_DIR}/gui/gui.c
 	${SATIN_OS_SRC}
 )
 include_directories(${SATIN_SRC_DIR})
