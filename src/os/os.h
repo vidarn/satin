@@ -16,6 +16,8 @@ const char *get_computer_name(void);
 int os_is_key_down(int key);
 
 extern char os_folder_separator;
+void os_path_strip_leaf(char *path);
+int os_is_path_valid(char *path);
 
 int atomic_increment_int32(int *a);
 
@@ -26,3 +28,10 @@ void *os_data_create(void);
 void os_data_set_data_folder_name(void *os_data, char *path);
 char **get_args(int *argc);
 char *get_cwd();
+
+enum OS_LIST_ENTRIES_TYPE {
+	OS_LIST_ENTRIES_TYPE_FOLDER = 1,
+	OS_LIST_ENTRIES_TYPE_FILE = 2,
+};
+int os_list_entries_in_folder(const char *path, const char **entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type)
+;

@@ -130,6 +130,30 @@ int os_is_key_down(int key) {
 	return GetKeyState(key) < 0;
 }
 
+void os_path_strip_leaf(char *path) {
+	if (path) {
+		char *last_separator = 0;
+		char *c = path;
+		while (*c != 0)
+		{
+			if (*c == os_folder_separator) {
+				last_separator = c;
+			}
+			c++;
+		}
+		if (last_separator) {
+			last_separator[1] = 0;
+		}
+	}
+}
+
+#include <shlwapi.h>
+#pragma comment(lib, "Shlwapi.lib") 
+int os_is_path_valid(char *path)
+{
+	return PathFileExistsA(path);
+}
+
 //#include "GL/glew.h"
 //#include "GL/wglew.h"
 #include "opengl.h"
@@ -596,4 +620,30 @@ char *get_cwd()
 	char *ret = calloc(len + 1, 1);
 	GetCurrentDirectoryA(len, ret);
 	return ret;
+}
+
+int os_list_entries_in_folder(const char *path, const char **entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type)
+{
+	int num_entries = 0;
+	char *buffer = calloc(strlen(path) + 8, 1);
+	sprintf(buffer, "%s/*.*", path);
+	WIN32_FIND_DATA fd;
+	HANDLE hFind = FindFirstFile(buffer, &fd);
+	if (hFind != INVALID_HANDLE_VALUE) {
+		do {
+			if (
+				(!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || type & OS_LIST_ENTRIES_TYPE_FOLDER) &&
+				( (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || type & OS_LIST_ENTRIES_TYPE_FILE))
+			{
+				entries[num_entries] = strdup(fd.cFileName);
+				num_entries++;
+				if (num_entries == max_num_entries) {
+					break;
+				}
+			}
+		} while (FindNextFile(hFind, &fd));
+		FindClose(hFind);
+	}
+	free(buffer);
+	return num_entries;
 }

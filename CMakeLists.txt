@@ -46,7 +46,7 @@ set(SATIN_SRC
 include_directories(${SATIN_SRC_DIR})
 include_directories(${SATIN_SRC_DIR}/opengl)
 
-add_library(satin ${SATIN_SRC} ${VLIB_SRC})
+add_library(satin STATIC ${SATIN_SRC} ${VLIB_SRC})
 
 if(APPLE)
     add_definitions(-DGL_SILENCE_DEPRECATION)

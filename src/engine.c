@@ -1111,12 +1111,17 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
 static int internal_load_sprite_from_fp(FILE *fp, const char *name, struct GameData *data)
 {
     int sprite_channels, sprite_w, sprite_h;
-    if(fp){
-        unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
-            &sprite_h, &sprite_channels, 4);
-        fclose(fp);
-        
-        return load_sprite_from_memory(sprite_w, sprite_h, sprite_data, data);
+	if (fp) {
+		unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
+			&sprite_h, &sprite_channels, 4);
+		fclose(fp);
+
+		if (sprite_data) {
+			return load_sprite_from_memory(sprite_w, sprite_h, sprite_data, data);
+		}else{
+			printf("Warning! Sprite \"%s\" was corrupt\n",name);
+			return 0;
+		}
     }else{
         printf("Warning! Sprite \"%s\" not found\n",name);
         return 0;
