@@ -165,20 +165,24 @@ int atomic_increment_int32(int *a) {
 }
 
 
-struct InputState input_state = { 0 };
-int framebuffer_w = 0;
-int framebuffer_h = 0;
+struct WindowProcParams {
+	volatile struct InputState *input_state;
+	int framebuffer_w;
+	int framebuffer_h;
+	int should_quit;
+};
 
 
 static LONG WINAPI
 WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	static PAINTSTRUCT ps;
+	struct WindowProcParams *params = GetWindowLongPtr(hWnd, GWLP_USERDATA);
 
 	switch (uMsg) {
 	case WM_SIZE:
-		framebuffer_w = LOWORD(lParam);
-		framebuffer_h = HIWORD(lParam);
+		params->framebuffer_w = LOWORD(lParam);
+		params->framebuffer_h = HIWORD(lParam);
 		PostMessage(hWnd, WM_PAINT, 0, 0);
 		return 0;
 
@@ -197,29 +201,29 @@ WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		};
 		if (DragDetect(hWnd, p)) {
 			printf("Drag\n");
-			input_state.mouse_state = MOUSE_DRAG;
+			params->input_state->mouse_state = MOUSE_DRAG;
 			POINT p;
 			GetCursorPos(&p);
 			ScreenToClient(hWnd, &p);
 			RECT r;
 			GetClientRect(hWnd, &r);
-			input_state.drag_start_x = (float)p.x / (float)(r.right - r.left);
-			input_state.drag_start_y = (float)p.y / (float)(r.top - r.bottom) + 1.f;
+			params->input_state->drag_start_x = (float)p.x / (float)(r.right - r.left);
+			params->input_state->drag_start_y = (float)p.y / (float)(r.top - r.bottom) + 1.f;
 		}
 		else {
 			printf("Click!\n");
-			input_state.mouse_state = MOUSE_CLICKED;
+			params->input_state->mouse_state = MOUSE_CLICKED;
 		}
 	}
 	return 0;
 
 	case WM_LBUTTONUP:
 		printf("Drag stop\n");
-		input_state.mouse_state = MOUSE_NOTHING;
+		params->input_state->mouse_state = MOUSE_NOTHING;
 		return 0;
 
 	case WM_CLOSE:
-		PostQuitMessage(0);
+		params->should_quit = 1;
 		return 0;
 	}
 
@@ -227,7 +231,7 @@ WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 static HWND
-CreateOpenGLWindow(const char* title, int x, int y, int width, int height,
+CreateOpenGLWindow(const char* title, int x, int y, struct WindowProcParams *window_proc_params,
 	BYTE type, DWORD flags)
 {
 	int         pf;
@@ -254,15 +258,20 @@ CreateOpenGLWindow(const char* title, int x, int y, int width, int height,
 		wc.lpszClassName = "OpenGL";
 
 		if (!RegisterClassA(&wc)) {
+			//NOTE(Vidar):The class is probably already registered, carry on!
+			/*
 			MessageBoxA(NULL, "RegisterClass() failed:  "
 				"Cannot register window class.", "Error", MB_OK);
-			return NULL;
+				*/
+			//return NULL;
 		}
 	}
 
 	hWnd = CreateWindowA("OpenGL", title, WS_OVERLAPPEDWINDOW |
 		WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-		x, y, width, height, NULL, NULL, hInstance, NULL);
+		x, y, window_proc_params->framebuffer_w, window_proc_params->framebuffer_h, NULL, NULL, hInstance, NULL);
+
+	SetWindowLongPtr(hWnd, GWLP_USERDATA, window_proc_params);
 
 	if (hWnd == NULL) {
 		MessageBoxA(NULL, "CreateWindow() failed:  Cannot create a window.",
@@ -321,10 +330,13 @@ float controller_left_thumb_deadzone = (float)XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE
 float controller_right_thumb_deadzone = (float)XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE/32768.f;
 
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console, 
-	int num_game_states, void *param, struct GameState *game_states, int debug_mode)
+	int num_game_states, void *param, struct GameState *game_states, int debug_mode, void *os_data)
 {
-	framebuffer_w = _framebuffer_w;
-	framebuffer_h = _framebuffer_h;
+	struct InputState input_state = { 0 };
+	struct WindowProcParams window_proc_params = { 0 };
+	window_proc_params.input_state = &input_state;
+	window_proc_params.framebuffer_w = _framebuffer_w;
+	window_proc_params.framebuffer_h = _framebuffer_h;
 	OutputDebugStringA("Launching game!\n");
 
 	if (show_console) {
@@ -340,7 +352,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	HWND  hWnd;				/* window */
 	MSG   msg;				/* message */
 
-	hWnd = CreateOpenGLWindow(window_title, 0, 0, framebuffer_w, framebuffer_h, PFD_TYPE_RGBA, 0);
+	hWnd = CreateOpenGLWindow(window_title, 0, 0, &window_proc_params, PFD_TYPE_RGBA, 0);
 	if (hWnd == NULL)
 		exit(1);
 
@@ -395,7 +407,9 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 
 	ShowWindow(hWnd, SW_SHOW);
 
-	struct Win32Data* os_data = os_data_create();
+	if (!os_data) {
+		os_data = os_data_create();
+	}
 	struct GameData* game_data = init(num_game_states, game_states, param, os_data, debug_mode);
 
 	HANDLE timer = CreateWaitableTimerA(NULL, TRUE, "Engine FPS timer");
@@ -406,7 +420,6 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	timer_interval.QuadPart = -1e7 / 60;
 	SetWaitableTimer(timer, &timer_interval, 0, 0, 0, FALSE);
 
-	int done = 0;
 	LARGE_INTEGER last_tick;
 	QueryPerformanceCounter(&last_tick);
 	QueryPerformanceFrequency(&counter_frequency);
@@ -414,17 +427,14 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	long int drag_start_y = 0;
 	int cursor_visible = 1;
 	int wait_for_event = 0;
-	while (!done) {
+	while (!window_proc_params.should_quit) {
 		int event_recieved;
-		if ((event_recieved = PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) || wait_for_event) {
+		if ((event_recieved = PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE)) || wait_for_event) {
 			wait_for_event = 0;
 			if (!event_recieved) {
-				GetMessageA(&msg, NULL, 0, 0);
+				GetMessageA(&msg, hWnd, 0, 0);
 			}
 			switch (msg.message) {
-			case WM_QUIT:
-				done = 1;
-				break;
 			case WM_CHAR:
 			{
 				/*
@@ -586,7 +596,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			delta_ticks.QuadPart *= TICKS_PER_SECOND;
 			delta_ticks.QuadPart /= counter_frequency.QuadPart;
 			wait_for_event = update((int)delta_ticks.QuadPart, input_state, game_data);
-			render(framebuffer_w, framebuffer_h, game_data);
+			render(window_proc_params.framebuffer_w, window_proc_params.framebuffer_h, game_data);
 			glFlush();
 			SwapBuffers(hDC);
 			input_state.prev_mouse_state = input_state.mouse_state;
