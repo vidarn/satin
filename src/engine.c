@@ -707,8 +707,19 @@ int load_mesh_unit_plane(int shader, struct GameData *data)
 }
 
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
-                          struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
-                          int *tri_data, int shader, struct GameData *data)
+	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
+	int *tri_data, int shader, struct GameData *data)
+{
+    int mesh_index = data->num_meshes;
+    data->meshes = realloc(data->meshes,(++data->num_meshes)
+                           *sizeof(struct Mesh));
+	update_mesh_from_memory(mesh_index, num_verts, pos_data, normal_data, uv_data, num_tris, tri_data, shader, data);
+    return mesh_index;
+}
+
+void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_data,
+	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
+	int *tri_data, int shader, struct GameData *data)
 {
     int vertex_data_len=num_verts*3*sizeof(float);
     int normal_data_len=num_verts*3*sizeof(float);
@@ -766,11 +777,7 @@ int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,tri_data,
                  GL_STATIC_DRAW);
     
-    int mesh_index = data->num_meshes;
-    data->meshes = realloc(data->meshes,(++data->num_meshes)
-                           *sizeof(struct Mesh));
     data->meshes[mesh_index] = mesh;
-    return mesh_index;
 }
 
 int load_custom_mesh_from_memory(int num_verts, int num_tris,
