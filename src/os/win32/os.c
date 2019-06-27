@@ -687,3 +687,11 @@ int os_list_entries_in_folder(const char *path, const char **entries, int max_nu
 	free(buffer);
 	return num_entries;
 }
+
+int os_does_file_exist(const char *filename)
+{
+	DWORD dwAttrib = GetFileAttributesA(filename);
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}

@@ -36,3 +36,5 @@ enum OS_LIST_ENTRIES_TYPE {
 };
 int os_list_entries_in_folder(const char *path, const char **entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type)
 ;
+int os_does_file_exist(const char *filename)
+;
