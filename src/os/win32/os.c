@@ -261,7 +261,6 @@ CreateOpenGLWindow(const char* title, int x, int y, struct WindowProcParams *win
 		wc.cbClsExtra = 0;
 		wc.cbWndExtra = 0;
 		wc.hInstance = hInstance;
-		vcam_log("wnclass icon: %d\n", icon);
 		if (icon) {
 			wc.hIcon = icon;
 		}
@@ -347,7 +346,6 @@ void win32_set_parent_window(void *os_data, HWND parent_hWnd)
 
 void win32_set_icon(void *os_data, HICON icon)
 {
-	vcam_log("Icon: %d\n", icon);
 	((struct Win32Data*)os_data)->icon = icon;
 }
 
