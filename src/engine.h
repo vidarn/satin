@@ -116,6 +116,9 @@ int load_mesh_unit_plane(int shader, struct GameData *data);
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, struct Vec2 *uv_data, int num_faces,
     int *face_data, int shader, struct GameData *data);
+void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_data,
+	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
+	int *tri_data, int shader, struct GameData *data);
 
 struct CustomMeshDataSpec
 {

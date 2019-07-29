@@ -65,11 +65,12 @@ struct Mesh{
 };
 
 struct Font{
-    int texture;
-    int first_char;
-    float height;
     struct Sprite sprites[128]; //ASCII characters...
     stbtt_bakedchar baked_chars[128];
+    int texture;
+    int first_char;
+    int last_char;
+    float height;
 };
 
 //TODO(Vidar):This and the RenderPass have confusing names...
@@ -235,22 +236,24 @@ void render_char_screen(int char_index, int font_id, float *x, float *y,
 {
     struct GameData *data = context->data;
     struct Font *font = data->fonts + font_id;
-    struct Sprite *sprite = font->sprites+char_index;
-    if(sprite){
-        stbtt_aligned_quad quad = {0};
-        float fx = 0.f;
-        float fy = 0.f;
-        stbtt_GetBakedQuad(font->baked_chars, font_bitmap_size, font_bitmap_size,
-            char_index, &fx, &fy, &quad, 0);
-        //TODO(Vidar):Fix the vertical positioning, should be able to
-        // use the quad
-        float offset_y = -quad.y1*0.5f/(float)reference_resolution;
-        float offset_x = quad.x0*0.5f/(float)reference_resolution;
-        render_sprite_screen_internal(sprite,*x+offset_x, *y+offset_y,0.f,sprite->width,
-            color, context);
-        *x += fx*0.5f/(float)reference_resolution;
-        *y += fy*0.5f/(float)reference_resolution;
-    }
+	if (char_index >= font->first_char && char_index <= font->last_char) {
+		struct Sprite *sprite = font->sprites + char_index;
+		if (sprite) {
+			stbtt_aligned_quad quad = { 0 };
+			float fx = 0.f;
+			float fy = 0.f;
+			stbtt_GetBakedQuad(font->baked_chars, font_bitmap_size, font_bitmap_size,
+				char_index, &fx, &fy, &quad, 0);
+			//TODO(Vidar):Fix the vertical positioning, should be able to
+			// use the quad
+			float offset_y = -quad.y1*0.5f / (float)reference_resolution;
+			float offset_x = quad.x0*0.5f / (float)reference_resolution;
+			render_sprite_screen_internal(sprite, *x + offset_x, *y + offset_y, 0.f, sprite->width,
+				color, context);
+			*x += fx * 0.5f / (float)reference_resolution;
+			*y += fy * 0.5f / (float)reference_resolution;
+		}
+	}
 }
 
 
@@ -704,8 +707,19 @@ int load_mesh_unit_plane(int shader, struct GameData *data)
 }
 
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
-                          struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
-                          int *tri_data, int shader, struct GameData *data)
+	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
+	int *tri_data, int shader, struct GameData *data)
+{
+    int mesh_index = data->num_meshes;
+    data->meshes = realloc(data->meshes,(++data->num_meshes)
+                           *sizeof(struct Mesh));
+	update_mesh_from_memory(mesh_index, num_verts, pos_data, normal_data, uv_data, num_tris, tri_data, shader, data);
+    return mesh_index;
+}
+
+void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_data,
+	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
+	int *tri_data, int shader, struct GameData *data)
 {
     int vertex_data_len=num_verts*3*sizeof(float);
     int normal_data_len=num_verts*3*sizeof(float);
@@ -763,11 +777,7 @@ int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,tri_data,
                  GL_STATIC_DRAW);
     
-    int mesh_index = data->num_meshes;
-    data->meshes = realloc(data->meshes,(++data->num_meshes)
-                           *sizeof(struct Mesh));
     data->meshes[mesh_index] = mesh;
-    return mesh_index;
 }
 
 int load_custom_mesh_from_memory(int num_verts, int num_tris,
@@ -1176,6 +1186,7 @@ int load_font(const char *name, double font_size, struct GameData *data)
     const int first_char = 32;
     const int num_chars = 96;
     font->first_char = first_char;
+    font->last_char = first_char+num_chars-1;
     unsigned char *font_bitmap = calloc(font_bitmap_size*font_bitmap_size,1);
     stbtt_BakeFontBitmap(font_data,0, (float)font_size, font_bitmap, font_bitmap_size,
         font_bitmap_size, first_char, num_chars, font->baked_chars+first_char);
@@ -1206,7 +1217,9 @@ int load_font(const char *name, double font_size, struct GameData *data)
             s.width        = sprite_w;
             s.inv_aspect   = sprite_h/sprite_w;
             font->sprites[i] = s;
-        }
+		}
+		else {
+		}
     }
 
     free(font_bitmap);

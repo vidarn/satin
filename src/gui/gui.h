@@ -16,6 +16,8 @@ struct GuiContext
     int color_rect_shader;
 };
 
+struct nk_user_font *gui_load_font(int font, struct GuiContext *context, struct GameData *data)
+;
 struct GuiContext *gui_init(int font, struct GameData *data);
 void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, struct GameData *data);
 void gui_draw(struct GuiContext *gui, struct RenderContext *context);

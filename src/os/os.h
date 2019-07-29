@@ -22,7 +22,8 @@ int os_is_path_valid(char *path);
 int atomic_increment_int32(int *a);
 
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console,
-	int num_game_states, void *param, struct GameState *game_states, int debug_mode);
+	int num_game_states, void *param, struct GameState *game_states, int debug_mode, void *os_data)
+;
 
 void *os_data_create(void);
 void os_data_set_data_folder_name(void *os_data, char *path);
@@ -34,4 +35,6 @@ enum OS_LIST_ENTRIES_TYPE {
 	OS_LIST_ENTRIES_TYPE_FILE = 2,
 };
 int os_list_entries_in_folder(const char *path, const char **entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type)
+;
+int os_does_file_exist(const char *filename)
 ;

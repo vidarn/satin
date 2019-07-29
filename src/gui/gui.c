@@ -19,18 +19,24 @@ float gui_text_width(nk_handle handle, float height, const char *text, int len)
     return text_width*(float)reference_resolution;
 }
 
-struct GuiContext *gui_init(int font, struct GameData *data)
+struct nk_user_font *gui_load_font(int font, struct GuiContext *context, struct GameData *data)
 {
-    struct GuiContext *context = calloc(1, sizeof(struct GuiContext));
-    struct nk_context *ctx = &context->ctx;
     struct nk_user_font *nk_font = calloc(1, sizeof(struct nk_user_font));
     struct GuiFont *gui_font = calloc(1, sizeof(struct GuiFont));
-    context->data = data;
     gui_font->font = font;
     gui_font->context = context;
     nk_font->userdata.ptr = gui_font;
     nk_font->height = get_font_height(font, data);
-    nk_font->width = gui_text_width;
+	nk_font->width = gui_text_width;
+	return nk_font;
+}
+
+struct GuiContext *gui_init(int font, struct GameData *data)
+{
+    struct GuiContext *context = calloc(1, sizeof(struct GuiContext));
+    struct nk_context *ctx = &context->ctx;
+    context->data = data;
+    struct nk_user_font *nk_font = gui_load_font(font, context, data);
     nk_init_default(ctx, nk_font);
     
     context->rect_shader = load_shader("gui" SATIN_SHADER_SUFFIX, "gui_rect" SATIN_SHADER_SUFFIX, data);
