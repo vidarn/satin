@@ -68,7 +68,6 @@ static int g_framebuffer_h;
 static void display_func(void)
 {
     if(g_game_data){
-        printf ("Good update\n");
         update(0,g_input_state, g_game_data);
         render(g_framebuffer_w, g_framebuffer_h, g_game_data);
         glutPostRedisplay();
@@ -81,8 +80,6 @@ static void display_func(void)
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console,
 	int num_game_states, void *param, struct GameState *game_states, int debug_mode)
 {
-    printf("Launching game\n");
-
 
     int num_args = 1;
     char *args[1] = {""};
