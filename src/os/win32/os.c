@@ -502,11 +502,27 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				}
 				break;
 			}
+			case WM_RBUTTONDOWN:
+			{
+				input_state.mouse_state_right = MOUSE_CLICKED;
+				input_state.mouse_down_right = 1;
+				POINT p;
+				GetCursorPos(&p);
+				ScreenToClient(hWnd, &p);
+				drag_start_x = p.x;
+				drag_start_y = p.y;
+				break;
+			}
+			case WM_RBUTTONUP:
+			{
+				input_state.mouse_down_right = 0;
+				input_state.mouse_state_right = MOUSE_NOTHING;
+				break;
+			}
 			case WM_LBUTTONDOWN:
 			{
 				input_state.mouse_state = MOUSE_CLICKED;
 				input_state.mouse_down = 1;
-				//POINTS tmp = MAKEPOINTS(msg.lParam);
 				POINT p;
 				GetCursorPos(&p);
 				ScreenToClient(hWnd, &p);
@@ -615,6 +631,16 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 					input_state.mouse_state = MOUSE_DRAG;
 				}
 			}
+			if (input_state.mouse_down_right) {
+				float dx = fabsf(input_state.drag_start_x - input_state.mouse_x);
+				float dy = fabsf(input_state.drag_start_y - input_state.mouse_y);
+				//printf("%f %f, %f %f\n",input_state.mouse_x,input_state.mouse_y,input_state.drag_start_x,input_state.drag_start_y);
+				float drag_dx = fabsf((float)GetSystemMetrics(SM_CXDRAG) / (float)(r.right - r.left));
+				float drag_dy = fabsf((float)GetSystemMetrics(SM_CYDRAG) / (float)(r.top - r.bottom));
+				if (dx>drag_dx || dy>drag_dy) {
+					input_state.mouse_state_right = MOUSE_DRAG;
+				}
+			}
 
 
 			LARGE_INTEGER current_tick, delta_ticks;
@@ -630,6 +656,10 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			input_state.prev_mouse_state = input_state.mouse_state;
 			if (input_state.mouse_state == MOUSE_CLICKED) {
 				input_state.mouse_state = MOUSE_NOTHING;
+			}
+			input_state.prev_mouse_state_right = input_state.mouse_state_right;
+			if (input_state.mouse_state_right == MOUSE_CLICKED) {
+				input_state.mouse_state_right = MOUSE_NOTHING;
 			}
 			input_state.num_keys_typed = 0;
 			input_state.scroll_delta_y = 0.f;
