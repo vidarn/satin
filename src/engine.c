@@ -374,8 +374,12 @@ void render_string_screen_fancy(const char *string, int font_id, float *x, float
 void render_line_screen(float x1, float y1, float x2, float y2, float thickness,
                         struct Color color, struct RenderContext *context)
 {
-	float scale_x = context->camera_2d.m[0];
-	float scale_y = context->camera_2d.m[4];
+	float m11 = context->camera_2d.m[0];
+	float m21 = context->camera_2d.m[1];
+	float m12 = context->camera_2d.m[3];
+	float m22 = context->camera_2d.m[4];
+	float scale_x = sqrtf(m11*m11 + m12*m12);
+	float scale_y = sqrtf(m21*m21 + m22*m22);
     float dx1 = (x2-x1);
     float dy1 = (y2-y1);
     float mag = sqrtf(dx1*dx1 + dy1*dy1);
