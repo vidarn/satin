@@ -69,11 +69,20 @@ static void display_func(void)
 {
     if(g_game_data){
         update(0,g_input_state, g_game_data);
+        g_input_state.num_keys_typed = 0;
         render(g_framebuffer_w, g_framebuffer_h, g_game_data);
         glutPostRedisplay();
         glutSwapBuffers();
     }else{
         printf("Bad update\n");
+    }
+}
+
+static void keyboard_func(unsigned char key, int x, int y)
+{
+    if (g_input_state.num_keys_typed<max_num_keys_typed) {
+        g_input_state.keys_typed[g_input_state.num_keys_typed] = key;
+        g_input_state.num_keys_typed++;
     }
 }
 
@@ -88,6 +97,8 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	glutInitWindowSize(_framebuffer_w, _framebuffer_h);
 	glutCreateWindow(window_title);
     glutDisplayFunc(display_func);
+    glutKeyboardFunc(keyboard_func);
+    
 
     g_game_data = 0;
 
