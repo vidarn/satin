@@ -579,10 +579,18 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			input_state.delta_x = m_x - input_state.mouse_x;
 			input_state.delta_y = m_y - input_state.mouse_y;
 			if (cursor_locked(game_data)) {
+				/*
 				m_x -= input_state.delta_x;
 				m_y -= input_state.delta_y;
 				d_x -= input_state.delta_x;
 				d_y -= input_state.delta_y;
+				*/
+				float offset_x = d_x - m_x;
+				float offset_y = d_y - m_y;
+				m_x += offset_x;
+				m_y += offset_y;
+				d_x += offset_x;
+				d_y += offset_y;
 
 				POINT tmp_p = { drag_start_x, drag_start_y };
 				ClientToScreen(hWnd, &tmp_p);
