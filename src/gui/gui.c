@@ -26,7 +26,7 @@ struct nk_user_font *gui_load_font(int font, struct GuiContext *context, struct 
     gui_font->font = font;
     gui_font->context = context;
     nk_font->userdata.ptr = gui_font;
-    nk_font->height = get_font_height(font, data);
+    nk_font->height = get_font_height(font, data)*(float)reference_resolution;
 	nk_font->width = gui_text_width;
 	return nk_font;
 }
@@ -296,7 +296,7 @@ struct nk_command_##name *name = (struct nk_command_##name *)cmd;
                 struct Color color = get_color(text->foreground);
                 //printf("rendering string \"%s\"\n", text->string);
                 //render_line_screen(x, y, x+0.01f, y, 0.01f, color, context);
-                y -= h/(float)reference_resolution;
+                y -= h;
                 render_string_screen_n(text->string, text->length, font->font, &x,
                     &y, color, context);
         NK_COMMAND_CASE_END
