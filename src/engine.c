@@ -1178,7 +1178,7 @@ int load_sprite_from_filename(const char *filename, struct GameData *data)
 
 float get_font_height(int font, struct GameData *data)
 {
-    return data->fonts[font].height*0.25f;
+    return data->fonts[font].height*0.25f/(float)reference_resolution;
 }
 
 int load_font(const char *name, double font_size, struct GameData *data)
