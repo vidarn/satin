@@ -94,6 +94,10 @@ void render_sprite_screen(int sprite,float x, float y,
     struct RenderContext *context);
 void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
     struct RenderContext *context);
+void render_sprite_screen_scaled_with_shader(int sprite,float x, float y,
+    float scale, int shader, struct ShaderUniform *uniforms, int num_uniforms,
+    struct RenderContext *context)
+;
 
 void render_to_memory(int w, int h, unsigned char *pixels,
     struct FrameData *frame_data, struct GameData *data);

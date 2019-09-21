@@ -176,7 +176,8 @@ void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
 // stuff?
 
 static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y,
-    float override_width, float width, struct Color color,
+    float override_width, float width, struct Color color, int shader,
+    struct ShaderUniform *uniforms_arg, int num_uniforms_arg,
     struct RenderContext *context)
 {
 
@@ -205,12 +206,16 @@ static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y
         0.f, h, 0.f,
         x+context->offset_x, y+context->offset_y, 1.0f,
     };
-    struct ShaderUniform uniforms[] = {
+    struct ShaderUniform uniforms[32] = {
         {"sprite",       SHADER_UNIFORM_SPRITE_POINTER, 1, &sprite},
         {"color",        SHADER_UNIFORM_VEC4, 1, &color},
     };
-    int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
-    render_quad(context->data->sprite_shader, m, uniforms, num_uniforms, context);
+    int num_uniforms = 2;
+    for(int i=0;i<num_uniforms_arg;i++){
+        uniforms[i+num_uniforms] = uniforms_arg[i];
+    }
+    num_uniforms += num_uniforms_arg;
+    render_quad(shader, m, uniforms, num_uniforms, context);
 }
 
 void render_sprite_screen(int sprite,float x, float y,
@@ -218,7 +223,8 @@ void render_sprite_screen(int sprite,float x, float y,
 {
     struct Color color = {1.f, 1.f, 1.f, 1.f};
     render_sprite_screen_internal(context->data->sprites + sprite,x,y,0.f,
-        context->data->sprites[sprite].width, color,context);
+        context->data->sprites[sprite].width,
+        color,context->data->sprite_shader, 0, 0, context);
 }
 
 void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
@@ -227,7 +233,17 @@ void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
     struct Color color = {1.f, 1.f, 1.f, 1.f};
     float width = context->data->sprites[sprite].width *scale;
     render_sprite_screen_internal(context->data->sprites + sprite,x,y,1.f,width,
-        color,context);
+        color,context->data->sprite_shader, 0, 0,context);
+}
+
+void render_sprite_screen_scaled_with_shader(int sprite,float x, float y,
+    float scale, int shader, struct ShaderUniform *uniforms, int num_uniforms,
+    struct RenderContext *context)
+{
+    struct Color color = {1.f, 1.f, 1.f, 1.f};
+    float width = context->data->sprites[sprite].width *scale;
+    render_sprite_screen_internal(context->data->sprites + sprite,x,y,1.f,
+        width, color,shader,uniforms,num_uniforms,context);
 }
 
 //TODO(Vidar):These could return a vec2 instead of taking a pointer...
@@ -249,7 +265,7 @@ void render_char_screen(int char_index, int font_id, float *x, float *y,
 			float offset_y = -quad.y1*0.5f / (float)reference_resolution;
 			float offset_x = quad.x0*0.5f / (float)reference_resolution;
 			render_sprite_screen_internal(sprite, *x + offset_x, *y + offset_y, 0.f, sprite->width,
-				color, context);
+				color,context->data->sprite_shader, 0, 0, context);
 			*x += fx * 0.5f / (float)reference_resolution;
 			*y += fy * 0.5f / (float)reference_resolution;
 		}
