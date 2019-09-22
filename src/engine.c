@@ -170,6 +170,7 @@ void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
         r->uniforms[i].data = calloc(1,size);
         memcpy(r->uniforms[i].data, uniforms[i].data, size);
     }
+    r->blend_mode = context->blend_mode;
 }
 
 //TODO(Vidar):Should we be able to specity the anchor point when rendering
@@ -1873,11 +1874,32 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect,
     struct GameData *data)
 {
     struct RenderQuadList *list = &frame_data->render_quad_list;
+    int shader = -1;
+    enum BlendMode blend_mode = BLEND_MODE_NONE;
     while(list != 0){
         for(int i=0;i<list->num;i++){
             struct RenderQuad render_quad = list->quads[i];
-            int shader = data->shaders[render_quad.shader].shader;
-            glUseProgram(shader);
+            int quad_shader = data->shaders[render_quad.shader].shader;
+            if(shader != quad_shader){
+                glUseProgram(quad_shader);
+                shader = quad_shader;
+            }
+            if(blend_mode != render_quad.blend_mode){
+                if(blend_mode == BLEND_MODE_NONE){
+                    glEnable(GL_BLEND);
+                }
+                switch(render_quad.blend_mode){
+                    case BLEND_MODE_PREMUL:
+                        glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+                        break;
+                    case BLEND_MODE_MULTIPLY:
+                        glBlendFunc(GL_DST_COLOR,GL_ZERO);
+                        break;
+                    case BLEND_MODE_NONE:
+                        glDisable(GL_BLEND);
+                        break;
+                }
+            }
             glBindVertexArray(data->quad_vertex_array);
             glBindBuffer(GL_ARRAY_BUFFER,data->quad_vertex_buffer);
             int loc=glGetUniformLocation(shader,"matrix");
@@ -1927,8 +1949,6 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
         render_meshes(frame_data,aspect,data);
         glDisable(GL_DEPTH_TEST);
         
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
         render_quads(frame_data,scale,aspect,data);
     }
 }

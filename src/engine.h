@@ -26,6 +26,12 @@ struct Color {
     float r,g,b,a;
 };
 
+enum BlendMode {
+    BLEND_MODE_PREMUL,
+    BLEND_MODE_MULTIPLY,
+    BLEND_MODE_NONE,
+};
+
 extern int reference_resolution;
 
 struct Shader;
@@ -250,6 +256,7 @@ struct RenderContext
     struct Matrix4 camera_3d;
     struct Matrix3 camera_2d;
 	int disable_depth_test;
+    enum BlendMode blend_mode;
 };
 
 
