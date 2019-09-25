@@ -451,6 +451,7 @@ void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUnifor
         render_mesh.uniforms[i].data = calloc(1,size);
         memcpy(render_mesh.uniforms[i].data, uniforms[i].data, size);
     }
+    render_mesh.blend_mode = context->blend_mode;
     
     struct RenderMeshList * rml = &context->frame_data->render_mesh_list;
     while(rml->num >= render_sprite_list_size){
@@ -1811,11 +1812,28 @@ void render_meshes(struct FrameData *frame_data, float aspect,
 	glEnable(GL_DEPTH_TEST);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	int current_depth_test_state = 1;
+    enum BlendMode blend_mode = BLEND_MODE_NONE;
     struct RenderMeshList *rml = &frame_data->render_mesh_list;
     while(rml != 0){
         for(int i=0;i<rml->num;i++){
             struct RenderMesh *render_mesh = rml->meshes + i;
             struct Mesh *mesh = data->meshes + render_mesh->mesh;
+            if(blend_mode != render_mesh->blend_mode){
+                if(blend_mode == BLEND_MODE_NONE){
+                    glEnable(GL_BLEND);
+                }
+                switch(render_mesh->blend_mode){
+                    case BLEND_MODE_PREMUL:
+                        glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+                        break;
+                    case BLEND_MODE_MULTIPLY:
+                        glBlendFunc(GL_DST_COLOR,GL_ZERO);
+                        break;
+                    case BLEND_MODE_NONE:
+                        glDisable(GL_BLEND);
+                        break;
+                }
+            }
             int shader = mesh->shader->shader;
             glUseProgram(shader);
             glBindVertexArray(mesh->vertex_array);

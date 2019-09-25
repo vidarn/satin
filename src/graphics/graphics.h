@@ -27,6 +27,7 @@ struct RenderMesh{
     int mesh;
     int num_uniforms;
 	int depth_test;
+    enum BlendMode blend_mode;
 };
 
 struct RenderLine{
