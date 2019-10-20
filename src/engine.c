@@ -1,5 +1,5 @@
 #include "engine.h"
-#include "vn_gl.h"
+//#include "vn_gl.h"
 #define STB_IMAGE_IMPLEMENTATION
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -18,28 +18,11 @@
 #include "stb_image_write.h"
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "tinyobj_loader_c.h"
-#include "graphics/graphics.h"
 #include "sort/sort.h"
+#include "graphics.h"
+#include "os/os.h"
 
 //#include <immintrin.h>
-
-static const int uniform_sizes[] = {
-#define SHADER_UNIFORM_TYPE(name,num,size,gl_type) num*size,
-    SHADER_UNIFORM_TYPES
-#undef SHADER_UNIFORM_TYPE
-};
-
-static const int uniform_gl_types[] = {
-#define SHADER_UNIFORM_TYPE(name,num,size,gl_type) gl_type,
-    SHADER_UNIFORM_TYPES
-#undef SHADER_UNIFORM_TYPE
-};
-
-static const int uniform_nums[] = {
-#define SHADER_UNIFORM_TYPE(name,num,size,gl_type) num,
-    SHADER_UNIFORM_TYPES
-#undef SHADER_UNIFORM_TYPE
-};
 
 struct SpriteData{
     int w,h;
@@ -56,13 +39,7 @@ struct Sprite{
     float uv_size[2];
 };
 
-struct Mesh{
-    GLuint vertex_array;
-    GLuint vertex_buffer;
-    GLuint index_buffer;
-    int num_tris, num_verts;
-    struct Shader *shader;
-};
+struct Mesh;
 
 struct Font{
     struct Sprite sprites[128]; //ASCII characters...
@@ -83,19 +60,20 @@ struct RenderTexture{
 
 struct GameData{
     //TODO(Vidar):Remove these...
-    GLuint line_vertex_array;
-    GLuint line_vertex_buffer;
-	GLuint sprite_vertex_array;
-	GLuint sprite_vertex_buffer;
+    uint32_t line_vertex_array;
+    uint32_t line_vertex_buffer;
+	uint32_t sprite_vertex_array;
+	uint32_t sprite_vertex_buffer;
     int sprite_shader;
     int line_shader;
-	GLuint quad_vertex_array;
-	GLuint quad_vertex_buffer;
-    GLuint *texture_ids;
+	//uint32_t quad_vertex_array;
+	//uint32_t quad_vertex_buffer;
+    struct Mesh *quad_mesh;
+    uint32_t *texture_ids;
     int num_texture_ids;
-    struct Shader *shaders;
+    struct Shader **shaders;
     int num_shaders;
-    struct Mesh *meshes;
+    struct Mesh **meshes;
     int num_meshes;
     struct Sprite *sprites;
     struct SpriteData *sprite_data;
@@ -120,6 +98,7 @@ struct GameData{
 	int lock_cursor;
 	void *os_data;
 	int debug_mode;
+    struct GraphicsData *graphics;
 };
 
 int hero_sprite;
@@ -133,19 +112,18 @@ int screen_render_texture;
 
 int test_mesh;
 
-float sprite_render_data[render_sprite_list_size*6*2*2*2];
-float line_render_data[  render_sprite_list_size*6*2*2*2];
 static const int font_bitmap_size = 512;
 const float quad_render_data[] = {
     0.f, 0.f,
     1.f, 0.f,
     1.f, 1.f,
-    1.f, 1.f,
     0.f, 1.f,
-    0.f, 0.f,
+};
+const int quad_render_index[] = {
+    0, 1, 2, 2, 3, 0
 };
 
-void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
+void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniforms,
     int num_uniforms, struct RenderContext *context)
 {
     struct RenderQuadList * list = &context->frame_data->render_quad_list;
@@ -157,18 +135,27 @@ void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
     }
     struct RenderQuad * r = list->quads + list->num;
     list->num++;
+    num_uniforms++; //NOTE(Vidar): Reserve space for the transform matrix;
 	*(struct Matrix3*)&r->m = multiply_matrix3(m, context->camera_2d);
     r->num_uniforms = num_uniforms;
-    r->uniforms = calloc(num_uniforms*sizeof(struct ShaderUniform),1);
+    //TODO(Vidar):Perhaps use a fixed size buffer to avoid this allocation
+    r->uniforms = calloc(num_uniforms*sizeof(struct GraphicsValueSpec),1);
     r->shader = shader;
-    for(int i=0;i<num_uniforms;i++){
-        enum ShaderUniformType type = uniforms[i].type;
-        int size = uniform_sizes[type]*uniforms[i].num;
-        r->uniforms[i].name = strdup(uniforms[i].name);
-        r->uniforms[i].type = type;
-        r->uniforms[i].num  = uniforms[i].num;
-        r->uniforms[i].data = calloc(1,size);
-        memcpy(r->uniforms[i].data, uniforms[i].data, size);
+    for(int i=0;i<num_uniforms-1;i++){
+        enum GraphicsValueType type = uniforms[i].type;
+        int size = graphics_value_sizes[type]*uniforms[i].num;
+        r->uniforms[i+1].name = strdup(uniforms[i].name);
+        r->uniforms[i+1].type = type;
+        r->uniforms[i+1].num  = uniforms[i].num;
+        //TODO(Vidar):We can allocate a single buffer for all uniforms and their names
+        r->uniforms[i+1].data = calloc(1,size);
+        memcpy(r->uniforms[i+1].data, uniforms[i].data, size);
+    }
+    {
+        r->uniforms[0].name = "matrix";
+        r->uniforms[0].num = 1;
+        r->uniforms[0].type = GRAPHICS_VALUE_MAT3;
+        r->uniforms[0].data = r->m;
     }
     r->blend_mode = context->blend_mode;
 }
@@ -178,7 +165,7 @@ void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
 
 static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y,
     float override_width, float width, struct Color color, int shader,
-    struct ShaderUniform *uniforms_arg, int num_uniforms_arg,
+    struct GraphicsValueSpec *uniforms_arg, int num_uniforms_arg,
     struct RenderContext *context)
 {
 
@@ -207,9 +194,9 @@ static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y
         0.f, h, 0.f,
         x+context->offset_x, y+context->offset_y, 1.0f,
     };
-    struct ShaderUniform uniforms[32] = {
-        {"sprite",       SHADER_UNIFORM_SPRITE_POINTER, 1, &sprite},
-        {"color",        SHADER_UNIFORM_VEC4, 1, &color},
+    struct GraphicsValueSpec uniforms[32] = {
+        {"sprite",  &sprite,      GRAPHICS_VALUE_SPRITE_POINTER, 1},
+        {"color",   &color,     GRAPHICS_VALUE_VEC4, 1},
     };
     int num_uniforms = 2;
     for(int i=0;i<num_uniforms_arg;i++){
@@ -238,7 +225,7 @@ void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
 }
 
 void render_sprite_screen_scaled_with_shader(int sprite,float x, float y,
-    float scale, int shader, struct ShaderUniform *uniforms, int num_uniforms,
+    float scale, int shader, struct GraphicsValueSpec *uniforms, int num_uniforms,
     struct RenderContext *context)
 {
     struct Color color = {1.f, 1.f, 1.f, 1.f};
@@ -407,8 +394,8 @@ void render_line_screen(float x1, float y1, float x2, float y2, float thickness,
         dx2, dy2, 0.f,
         x1+context->offset_x, y1+context->offset_y, 1.0f,
     };
-    struct ShaderUniform uniforms[] = {
-        {"color", SHADER_UNIFORM_VEC4, 1, &color},
+    struct GraphicsValueSpec uniforms[] = {
+        {"color", &color, GRAPHICS_VALUE_VEC4, 1},
     };
     int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
     render_quad(context->data->line_shader, m, uniforms, num_uniforms, context);
@@ -423,13 +410,13 @@ void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
     render_line_screen(x1, y2, x2, y2, thickness, color, context);
 }
 
-void render_mesh(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
+void render_mesh(int mesh, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
 	int num_uniforms, struct RenderContext *context)
 {
 	render_mesh_with_callback(mesh, mat, uniforms, num_uniforms, 0, 0, context);
 }
 
-void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
+void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
     int num_uniforms, void(*callback)(void *param), void *callback_param, struct RenderContext *context)
 {
     struct RenderMesh render_mesh = {0};
@@ -441,10 +428,10 @@ void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUnifor
     *(struct Matrix4*)&render_mesh.cam = context->camera_3d;
     render_mesh.num_uniforms = num_uniforms;
     //TODO(Vidar):Can we avoid allocating memory??
-    render_mesh.uniforms = calloc(num_uniforms*sizeof(struct ShaderUniform),1);
+    render_mesh.uniforms = calloc(num_uniforms*sizeof(struct GraphicsValueSpec),1);
     for(int i=0;i<num_uniforms;i++){
-        enum ShaderUniformType type = uniforms[i].type;
-        int size = uniform_sizes[type]*uniforms[i].num;
+        enum GraphicsValueType type = uniforms[i].type;
+        int size = graphics_value_sizes[type]*uniforms[i].num;
         render_mesh.uniforms[i].name = strdup(uniforms[i].name);
         render_mesh.uniforms[i].type = type;
         render_mesh.uniforms[i].num = uniforms[i].num;
@@ -465,10 +452,11 @@ void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUnifor
 }
 
 static int add_texture(unsigned char *sprite_data, int sprite_w, int sprite_h,
-    GLint format, struct GameData *data)
+    int32_t format, struct GameData *data)
 {
     data->texture_ids = realloc(data->texture_ids, (data->num_texture_ids+1)*
-                                sizeof(GLuint));
+                                sizeof(uint32_t));
+    /* BOOKMARK(Vidar): OpenGL call
 	glGenTextures(1, data->texture_ids + data->num_texture_ids);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, data->texture_ids[data->num_texture_ids]);
@@ -478,11 +466,12 @@ static int add_texture(unsigned char *sprite_data, int sprite_w, int sprite_h,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexImage2D(GL_TEXTURE_2D, 0,format, sprite_w, sprite_h,
         0, format, GL_UNSIGNED_BYTE, sprite_data);
+     */
     data->num_texture_ids++;
     return data->num_texture_ids - 1;
 }
 
-int create_render_texture(int w, int h, GLint format, struct GameData *data)
+int create_render_texture(int w, int h, int32_t format, struct GameData *data)
 {
     return 0;
     //TODO(Vidar): Does not work in opengl ES
@@ -554,8 +543,7 @@ int load_mesh(const char *name, int shader,
             buf,len,flags);
         free(buf);
 
-        struct Mesh mesh;
-        mesh.shader=&(data->shaders[shader]);
+        struct Mesh *mesh;
         
         
         //TODO(Vidar): Copy and sort attrib.faces.
@@ -617,6 +605,7 @@ int load_mesh(const char *name, int shader,
             }
         }
         
+        /* BOOKMARK(Vidar): OpenGL
         mesh.num_tris = attrib.num_face_num_verts;
         int index_data_len = mesh.num_tris*3*sizeof(int);
         unsigned int *index_data=calloc(index_data_len,1);
@@ -628,30 +617,11 @@ int load_mesh(const char *name, int shader,
         free(faces_tmp);
         free(idx);
         free(idx_tmp);
-
-        /*
-        int num_verts = attrib.num_face_num_verts*3;
-        int vertex_data_len=num_verts*3*sizeof(float);
-        int normal_data_len=num_verts*3*sizeof(float);
-        float *vertex_data=calloc(vertex_data_len+normal_data_len,1);
-        float *normal_data = vertex_data + num_verts*3;
-        for(int i=0;i<attrib.num_face_num_verts;i++){
-            for(int j=0;j<3;j++){
-                int a = i*3 + j;
-                tinyobj_vertex_index_t v = attrib.faces[a];
-                vertex_data[a*3 + 0] = attrib.vertices[v.v_idx*3  + 0];
-                vertex_data[a*3 + 1] = attrib.vertices[v.v_idx*3  + 1];
-                vertex_data[a*3 + 2] = attrib.vertices[v.v_idx*3  + 2];
-                
-                normal_data[a*3 + 0] = attrib.normals[v.vn_idx*3 + 0];
-                normal_data[a*3 + 1] = attrib.normals[v.vn_idx*3 + 1];
-                normal_data[a*3 + 2] = attrib.normals[v.vn_idx*3 + 2];
-            }
-        }
-         */
         
         mesh.num_verts = num_verts;
 
+        
+        mesh.shader=data->shaders+shader;
         glGenVertexArrays(1,&mesh.vertex_array);
         glBindVertexArray(mesh.vertex_array);
         glGenBuffers(1,&mesh.vertex_buffer);
@@ -689,10 +659,11 @@ int load_mesh(const char *name, int shader,
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.index_buffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,index_data,
             GL_STATIC_DRAW);
-
+*/
+        
         int mesh_index = data->num_meshes;
         data->meshes = realloc(data->meshes,(++data->num_meshes)
-            *sizeof(struct Mesh));
+            *sizeof(struct Mesh *));
         data->meshes[mesh_index] = mesh;
         return mesh_index;
     } else{
@@ -734,7 +705,7 @@ int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
 {
     int mesh_index = data->num_meshes;
     data->meshes = realloc(data->meshes,(++data->num_meshes)
-                           *sizeof(struct Mesh));
+                           *sizeof(struct Mesh *));
 	update_mesh_from_memory(mesh_index, num_verts, pos_data, normal_data, uv_data, num_tris, tri_data, shader, data);
     return mesh_index;
 }
@@ -753,8 +724,10 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
         memcpy(vertex_data + 2*num_verts*3,uv_data,  uv_map_data_len);
     }
 
+    /*BOOKMARK(Vidar): OpenGL
     struct Mesh mesh;
-    mesh.shader=&(data->shaders[shader]);
+    mesh.shader=data->shaders[shader];
+
     glGenVertexArrays(1,&mesh.vertex_array);
     glBindVertexArray(mesh.vertex_array);
     glGenBuffers(1,&mesh.vertex_buffer);
@@ -800,33 +773,25 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
                  GL_STATIC_DRAW);
     
     data->meshes[mesh_index] = mesh;
+     */
 }
 
 int load_custom_mesh_from_memory(int num_verts, int num_tris,
-    int *tri_data, int shader, struct GameData *data, int num_data_specs, struct CustomMeshDataSpec *data_spec)
+int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct GameData *data)
 {
-	int total_data_len = 0;
-	for (int i = 0; i < num_data_specs; i++) {
-		struct CustomMeshDataSpec spec = data_spec[i];
-		total_data_len += uniform_sizes[spec.type]*num_verts;
-	}
-    unsigned char *vertex_data=calloc(total_data_len,1);
-	unsigned char *vd = vertex_data;
-	for (int i = 0; i < num_data_specs; i++) {
-		struct CustomMeshDataSpec spec = data_spec[i];
-		int data_len = uniform_sizes[spec.type]*num_verts;
-		memcpy(vd, spec.data, data_len);
-		vd += data_len;
-	}
 
-    struct Mesh mesh;
-    mesh.shader=&(data->shaders[shader]);
+
+    
+    //BOOKMARK(Vidar):implement mesh creation
+    struct Mesh *mesh = graphics_create_mesh(data_spec, num_data_specs, num_verts, tri_data, num_tris*3, data->graphics);
+    
+    
+    
+    /*BOOKMARK(Vidar): OpenGL
     glGenVertexArrays(1,&mesh.vertex_array);
     glBindVertexArray(mesh.vertex_array);
     glGenBuffers(1,&mesh.vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER,mesh.vertex_buffer);
-    
-    mesh.num_verts = num_verts;
     
     glBufferData(GL_ARRAY_BUFFER,total_data_len,vertex_data,
                  GL_DYNAMIC_DRAW);
@@ -834,7 +799,7 @@ int load_custom_mesh_from_memory(int num_verts, int num_tris,
     //free(vertex_data);
 	int offset = 0;
 	for (int i = 0; i < num_data_specs; i++) {
-		struct CustomMeshDataSpec spec = data_spec[i];
+		struct CustomGraphicsValueSpec spec = data_spec[i];
 		int loc=glGetAttribLocation(mesh.shader->shader,spec.name);
 		if(loc == -1){
 			printf("Error: Could not find \"%s\" attribute in shader\n", spec.name);
@@ -852,16 +817,17 @@ int load_custom_mesh_from_memory(int num_verts, int num_tris,
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,tri_data,
                  GL_STATIC_DRAW);
-    
+    */
     int mesh_index = data->num_meshes;
     data->meshes = realloc(data->meshes,(++data->num_meshes)
-                           *sizeof(struct Mesh));
+                           *sizeof(struct Mesh *));
     data->meshes[mesh_index] = mesh;
     return mesh_index;
 }
 
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data)
 {
+    /*
 	//TODO(Vidar):Only supports OBJ for now
 	FILE *fp = open_file(name, ext, "wt",data);
 	if (fp) {
@@ -882,6 +848,7 @@ void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameD
 		}
 		fclose(fp);
 	}
+     */
 }
 
 void calculate_mesh_normals(int num_verts, struct Vec3 *pos_data,
@@ -920,6 +887,7 @@ void calculate_mesh_normals(int num_verts, struct Vec3 *pos_data,
 void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
     struct Vec3 *normal_data, struct Vec2 *uv_data, struct GameData *data)
 {
+    /*BOOKMARK(Vidar): OpenGL
     struct Mesh m = data->meshes[mesh];
     glBindBuffer(GL_ARRAY_BUFFER, m.vertex_buffer);
     unsigned char *buffer = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
@@ -932,18 +900,19 @@ void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
         memcpy(buffer+vertex_data_len+normal_data_len, uv_data, uv_map_data_len);
     }
     glUnmapBuffer(GL_ARRAY_BUFFER);
+     */
 }
 
-#pragma optimize("", off)
-void update_custom_mesh_verts_from_memory(int mesh, int num_data_specs, struct CustomMeshDataSpec *data_spec,
+void update_custom_mesh_verts_from_memory(int mesh, int num_data_specs, struct GraphicsValueSpec *data_spec,
 	struct GameData *data)
 {
+    /*BOOKMARK(Vidar): OpenGL
     struct Mesh m = data->meshes[mesh];
     glBindBuffer(GL_ARRAY_BUFFER, m.vertex_buffer);
     unsigned char *buffer = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 	if (buffer) {
 		for (int i = 0; i < num_data_specs; i++) {
-			struct CustomMeshDataSpec spec = data_spec[i];
+			struct CustomGraphicsValueSpec spec = data_spec[i];
 			int data_len = uniform_sizes[spec.type] * m.num_verts;
 			memcpy(buffer, spec.data, data_len);
 			buffer += data_len;
@@ -957,17 +926,19 @@ void update_custom_mesh_verts_from_memory(int mesh, int num_data_specs, struct C
 			printf("OpenGL error %d\n",err);
 		}
 	}
+     */
 }
-#pragma optimize("", on)
 
 int get_mesh_num_verts(int mesh, struct GameData *data)
 {
-    return data->meshes[mesh].num_verts;
+    //return data->meshes[mesh].num_verts;
+    return 0;
 }
 
 void get_mesh_vert_data(int mesh, struct Vec3 *pos_data, struct Vec3 *normal_data,
     struct Vec2 *uv_data, struct GameData *data)
 {
+    /*BOOKMARK(Vidar):OpenGL
     struct Mesh m = data->meshes[mesh];
     glBindBuffer(GL_ARRAY_BUFFER, m.vertex_buffer);
     unsigned char *buffer = glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
@@ -982,47 +953,46 @@ void get_mesh_vert_data(int mesh, struct Vec3 *pos_data, struct Vec3 *normal_dat
         memcpy(uv_data, buffer+vertex_data_len+normal_data_len, uv_map_data_len);
     }
     glUnmapBuffer(GL_ARRAY_BUFFER);
+     */
 }
 
 int get_mesh_num_tris(int mesh, struct GameData *data)
 {
-    return data->meshes[mesh].num_tris;
+    //return data->meshes[mesh].num_tris;
+    return 0;
 }
 
 void get_mesh_tri_data(int mesh, int *tri_data, struct GameData *data)
 {
+    /*BOOKMARK(Vidar): OpenGL
     struct Mesh m = data->meshes[mesh];
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.index_buffer);
     unsigned char *buffer = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_READ_ONLY);
     int data_len = m.num_tris*sizeof(int)*3;
     memcpy(tri_data, buffer, data_len);
     glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+     */
 }
 
 unsigned int get_mesh_vertex_buffer(int mesh, struct GameData *data)
 {
-    struct Mesh m = data->meshes[mesh];
-	return m.vertex_buffer;
+    /*struct Mesh m = data->meshes[mesh];
+	return m.vertex_buffer;*/
+    return 0;
 }
 
 #define ERROR_BUFFER_LEN 512
 
-//TODO(Vidar):Support additional parameters...
-int load_shader(const char* vert_filename, const char * frag_filename,
-    struct GameData *data, ...)
+int load_shader(const char* vert_filename,
+    const char * frag_filename, struct GameData *data)
 {
     char error_buffer[ERROR_BUFFER_LEN] = {0};
-    va_list args;
-    va_start(args,data);
-    struct Shader shader = compile_shader_filename_vararg(vert_filename,
-        frag_filename, error_buffer, ERROR_BUFFER_LEN, "#version 330\n",
-        data, args);
-    va_end(args);
+    struct Shader *shader = graphics_compile_shader(vert_filename, frag_filename, error_buffer, ERROR_BUFFER_LEN, data->graphics);
     if(error_buffer[0] != 0){
         printf("Shader compilation error:\n%s\n",error_buffer);
     }
     data->num_shaders++;
-    data->shaders = realloc(data->shaders,data->num_shaders*sizeof(struct Shader));
+    data->shaders = realloc(data->shaders,data->num_shaders*sizeof(struct Shader *));
     data->shaders[data->num_shaders-1] = shader;
     return data->num_shaders - 1;
 }
@@ -1030,6 +1000,7 @@ int load_shader(const char* vert_filename, const char * frag_filename,
 int load_shader_from_string(const char* vert_source, const char * frag_source,
     struct GameData *data)
 {
+    /*BOOKMARK(Vidar): OpenGL
     char error_buffer[ERROR_BUFFER_LEN] = {0};
 	struct Shader shader = { 0 };
 	shader.shader = compile_shader(vert_source,
@@ -1041,11 +1012,14 @@ int load_shader_from_string(const char* vert_source, const char * frag_source,
     data->shaders = realloc(data->shaders,data->num_shaders*sizeof(struct Shader));
     data->shaders[data->num_shaders-1] = shader;
     return data->num_shaders - 1;
+     */
+    return 0;
 }
 
 int load_image_from_memory(int sprite_w, int sprite_h,
 	unsigned char *sprite_data, struct GameData *data)
 {
+    /*BOOKMARK(Vidar): OpenGL
     int texture = add_texture(sprite_data, sprite_w, sprite_h,GL_RGBA,data);
     struct Sprite s;
     s.uv_offset[0] = 0.f;
@@ -1071,6 +1045,8 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     data->num_sprites++;
 
     return data->num_sprites-1;
+     */
+    return 0;
 }
 
 int load_image(const char *name, struct GameData *data)
@@ -1089,9 +1065,11 @@ void update_sprite_from_memory(int sprite, unsigned char *sprite_data,
     //TODO(Vidar):Update padding as well...
     struct Sprite *s = data->sprites + sprite;
     struct SpriteData *sd = data->sprite_data + sprite;
+    /*BOOKMARK(Vidar): OpenGL
     glBindTexture(GL_TEXTURE_2D, data->texture_ids[s->texture]);
     glTexSubImage2D(GL_TEXTURE_2D, 0, sd->x, sd->y, sd->w, sd->h, GL_RGBA,
         GL_UNSIGNED_BYTE, sprite_data);
+     */
 }
 
 void resize_image_from_memory(int sprite, int sprite_w, int sprite_h, unsigned char *sprite_data,
@@ -1107,10 +1085,12 @@ void resize_image_from_memory(int sprite, int sprite_w, int sprite_h, unsigned c
 	sd->x = 0;
 	sd->y = 0;
 
+    /*BOOKMARK(Vidar): OpenGL
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, data->texture_ids[s->texture]);
     glTexImage2D(GL_TEXTURE_2D, 0,GL_RGBA, sprite_w, sprite_h,
         0, GL_RGBA, GL_UNSIGNED_BYTE, sprite_data);
+     */
 }
 
 int load_sprite_from_memory(int sprite_w, int sprite_h,
@@ -1220,6 +1200,7 @@ int load_font(const char *name, double font_size, struct GameData *data)
         font_rgba[i*4+2]=(unsigned char)((float)font_bitmap[i]);
         font_rgba[i*4+3]=(unsigned char)((float)font_bitmap[i]);
     }
+    /*BOOKMARK(Vidar): OpenGL
     font->texture =
         add_texture(font_rgba, font_bitmap_size, font_bitmap_size,GL_RGBA,data);
     //NOTE(Vidar): Create sprites from each baked_char...
@@ -1247,6 +1228,8 @@ int load_font(const char *name, double font_size, struct GameData *data)
     free(font_bitmap);
     free(font_rgba);
     return ret;
+     */
+    return 0;
 }
 
 //TODO(Vidar):Pad the sprites
@@ -1315,6 +1298,7 @@ void create_sprite_atlas(struct GameData *data)
         sprite_data++;
         sprite++;
     }
+    /*BOOKMARK(Vidar): OpenGL
     int texture_id = add_texture(atlas_data,w,h,GL_RGBA,data);
     sprite=data->sprites;
 	sprite_data = data->sprite_data;
@@ -1325,12 +1309,7 @@ void create_sprite_atlas(struct GameData *data)
         sprite_data++;
         sprite++;
     }
-    //printf("Atlas created\n");
-    //DEBUG(Vidar):Write atlas to image
-#if 0
-    stbi_write_png("/tmp/atlas.png",w,h,4,atlas_data,0);
-    printf("Atlas written to file\n");
-#endif
+    */
 }
 
 int get_mean_ticks(int length, struct GameData *data)
@@ -1424,7 +1403,9 @@ void frame_data_reset(struct FrameData *frame_data)
         while(list != 0){
             for(int i=0;i<list->num;i++){
                 struct RenderQuad *r = list->quads + i;
-                for(int j=0;j<r->num_uniforms;j++){
+                //NOTE(Vidar):The first uniform is the transform matrix, don't
+                // try to free it!
+                for(int j=1;j<r->num_uniforms;j++){
                     free(r->uniforms[j].name);
                     free(r->uniforms[j].data);
                 }
@@ -1579,16 +1560,28 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 {
     struct GameData *data = calloc(1,sizeof(struct GameData));
 	set_os_data(os_data,data);
+    data->graphics = os_data_get_graphics(os_data);
 	data->debug_mode = debug_mode;
-    data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
-
-    data->line_shader = load_shader("line" SATIN_SHADER_SUFFIX, "line" SATIN_SHADER_SUFFIX , data, "pos", (char*)0);
 
     data->num_game_state_types = num_game_states;
     data->game_state_types = calloc(num_game_states,sizeof(struct GameState));
 	memcpy(data->game_state_types, game_states, num_game_states * sizeof(struct GameState));
     
+    data->line_shader = load_shader("line", "line" , data);
+    {
+        struct GraphicsValueSpec data_specs[] = {
+            {"pos", (uint8_t *)quad_render_data, GRAPHICS_VALUE_VEC2}
+        };
+        int num_data_specs = sizeof(data_specs)/sizeof(*data_specs);
+        //graphics_create_mesh(data_specs, , 4, (int*)quad_render_index, sizeof(quad_render_index), data->graphics);
+        //load_custom_mesh_from_memory(4, 2, (int*)quad_render_index, num_data_specs, data_specs, data);
+        data->quad_mesh = graphics_create_mesh(data_specs, num_data_specs, 4, (int*)quad_render_index, 6, data->graphics);
+    }
     
+    /* BOOKMARK(Vidar): OpenGL call
+    data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
+
+
 	glGenVertexArrays(1,&data->sprite_vertex_array);
 	glBindVertexArray(data->sprite_vertex_array);
 	glGenBuffers(1,&data->sprite_vertex_buffer);
@@ -1634,17 +1627,6 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
         glEnableVertexAttribArray(pos_loc);
         glVertexAttribPointer(pos_loc,2,GL_FLOAT,GL_FALSE,
             6*sizeof(GL_FLOAT),(void*)0);
-
-        /*
-        int col_loc=glGetAttribLocation(
-            data->shaders[data->line_shader].shader,"vert_col");
-        if(col_loc == -1){
-            printf("Error: Could not find \"col\" attribute in shader\n");
-        }
-        glEnableVertexAttribArray(col_loc);
-        glVertexAttribPointer(col_loc,4,GL_FLOAT,GL_FALSE,
-            6*sizeof(GL_FLOAT),(void*)(2*sizeof(GL_FLOAT)));
-         */
     }
 
     glActiveTexture(GL_TEXTURE0);
@@ -1658,7 +1640,7 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     glEnableVertexAttribArray(0); //"pos" is always at loc 0
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
 
-    
+    */
 	if (num_game_states > 0) {
 		data->active_game_state = 0;
 		data->game_states = calloc(1, sizeof(struct GameState));
@@ -1667,13 +1649,6 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 		data->game_states[0].init(data, param, -1);
 
 		data->active_game_state = -1;
-		/*
-		for (int i = 1; i < data->num_game_state_types; i++) {
-			struct GameState tmp_game_state = data->game_state_types[i];
-			tmp_game_state.init(data, 0, -1);
-			tmp_game_state.destroy(data);
-		}
-		*/
 		data->active_game_state = 0;
 	}
 
@@ -1728,39 +1703,40 @@ struct Matrix3 get_sprite_matrix(int sprite, struct GameData *data)
 }
 
 void process_uniforms(int shader, int num_uniforms,
-    struct ShaderUniform *uniforms, struct GameData *data)
+    struct GraphicsValueSpec *uniforms, struct GameData *data)
 {
+    /* BOOKMARK(Vidar): OpenGL call
     int num_textures = 0;
     for(int j=0;j<num_uniforms;j++){
-        struct ShaderUniform u = uniforms[j];
+        struct GraphicsValueSpec u = uniforms[j];
         int loc=glGetUniformLocation(shader,u.name);
         if(loc == -1){
             printf("Warning: Could not find \"%s\" uniform in shader\n",
                 u.name);
         }else{
             switch(u.type){
-                case SHADER_UNIFORM_INT:
+                case GRAPHICS_VALUE_INT:
                     glUniform1iv(loc, u.num, u.data);
                     break;
-                case SHADER_UNIFORM_FLOAT:
+                case GRAPHICS_VALUE_FLOAT:
                     glUniform1fv(loc, u.num, u.data);
                     break;
-                case SHADER_UNIFORM_MAT4:
+                case GRAPHICS_VALUE_MAT4:
                     glUniformMatrix4fv(loc,u.num,GL_FALSE,u.data);
                     break;
-                case SHADER_UNIFORM_MAT3:
+                case GRAPHICS_VALUE_MAT3:
                     glUniformMatrix3fv(loc,u.num,GL_FALSE,u.data);
                     break;
-                case SHADER_UNIFORM_VEC4:
+                case GRAPHICS_VALUE_VEC4:
                     glUniform4fv(loc,u.num,u.data);
                     break;
-                case SHADER_UNIFORM_VEC3:
+                case GRAPHICS_VALUE_VEC3:
                     glUniform3fv(loc,u.num,u.data);
                     break;
-                case SHADER_UNIFORM_VEC2:
+                case GRAPHICS_VALUE_VEC2:
                     glUniform2fv(loc,u.num,u.data);
                     break;
-                case SHADER_UNIFORM_TEX2:
+                case GRAPHICS_VALUE_TEX2:
                 {
                     int texture_id = *(int*)u.data;
                     glUniform1i(loc, num_textures);
@@ -1769,21 +1745,16 @@ void process_uniforms(int shader, int num_uniforms,
                     num_textures++;
                     break;
                 }
-                case SHADER_UNIFORM_SPRITE_POINTER:
-                case SHADER_UNIFORM_SPRITE:
+                case GRAPHICS_VALUE_SPRITE_POINTER:
+                case GRAPHICS_VALUE_SPRITE:
                 {
                     struct Sprite *sprite;
-                    if(u.type == SHADER_UNIFORM_SPRITE_POINTER){
+                    if(u.type == GRAPHICS_VALUE_SPRITE_POINTER){
                         sprite = *(struct Sprite**)u.data;
                     }else{
                         int sprite_id = *(int*)u.data;
                         sprite = data->sprites + sprite_id;
                     }
-		    /*
-		    printf("rendering sprite %f %f %f %f\n",
-			    sprite->uv_offset[0], sprite->uv_offset[1],
-			    sprite->uv_size[0], sprite->uv_size[1]);
-			    */
                     glUniform1i(loc, num_textures);
                     glActiveTexture(GL_TEXTURE0 + num_textures);
                     glBindTexture(GL_TEXTURE_2D,
@@ -1804,11 +1775,13 @@ void process_uniforms(int shader, int num_uniforms,
             }
         }
     }
+     */
 }
 
 void render_meshes(struct FrameData *frame_data, float aspect,
     struct GameData *data)
 {
+    /* BOOKMARK(Vidar): OpenGL call
 	glEnable(GL_DEPTH_TEST);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	int current_depth_test_state = 1;
@@ -1886,6 +1859,7 @@ void render_meshes(struct FrameData *frame_data, float aspect,
         }
         rml = rml->next;
     }
+     */
 }
 
 void render_quads(struct FrameData *frame_data, float scale, float aspect,
@@ -1897,13 +1871,17 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect,
     while(list != 0){
         for(int i=0;i<list->num;i++){
             struct RenderQuad render_quad = list->quads[i];
-            int quad_shader = data->shaders[render_quad.shader].shader;
+            struct Shader *quad_shader = data->shaders[render_quad.shader];
+            /* BOOKMARK(Vidar): OpenGL call
             if(shader != quad_shader){
                 glUseProgram(quad_shader);
                 shader = quad_shader;
             }
+            */
+            /* BOOKMARK(Vidar): OpenGL call
             if(blend_mode != render_quad.blend_mode){
                 if(blend_mode == BLEND_MODE_NONE){
+                    
                     glEnable(GL_BLEND);
                 }
                 switch(render_quad.blend_mode){
@@ -1918,6 +1896,11 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect,
                         break;
                 }
             }
+            */
+            
+            //graphics_set_blend_mode(render_quad.blend_mode);
+
+            /* BOOKMARK(Vidar): OpenGL call
             glBindVertexArray(data->quad_vertex_array);
             glBindBuffer(GL_ARRAY_BUFFER,data->quad_vertex_buffer);
             int loc=glGetUniformLocation(shader,"matrix");
@@ -1941,6 +1924,19 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect,
             process_uniforms(shader, render_quad.num_uniforms,
                 render_quad.uniforms, data);
             glDrawArrays(GL_TRIANGLES, 0, 6);
+          */
+            for(int i=0;i<3;i++){
+                render_quad.m[i*3+0] *= 2.f*scale;
+                render_quad.m[i*3+1] *= 2.f*scale*aspect;
+            }
+            render_quad.m[6] -= 1.f;
+            render_quad.m[7] -= 1.f;
+            if(aspect < 1.f){
+                render_quad.m[7] += 1 - scale*aspect;
+            }else{
+                render_quad.m[6] += 1 - scale;
+            }
+            graphics_render_mesh(data->quad_mesh, quad_shader, render_quad.uniforms, render_quad.num_uniforms, data->graphics);
         }
         list = list->next;
     }
@@ -1949,6 +1945,7 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect,
 static void render_internal(int w, int h, struct FrameData *frame_data,
     struct GameData *data)
 {
+
     if(frame_data != 0){
         float aspect = (float)w/(float)h;
         float scale=1.f;
@@ -1956,24 +1953,32 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
             scale=1.f/aspect;
         }
         
+     /*BOOKMARK(Vidar):OpenG
         glViewport(0, 0, w, h);
-
+*/
+        graphics_begin_render_pass(&frame_data->clear_color.r, data->graphics);
         if(frame_data->clear){
-            glClearColor(frame_data->clear_color.r, frame_data->clear_color.g,
+            graphics_clear(data->graphics);
+            /*glClearColor(frame_data->clear_color.r, frame_data->clear_color.g,
                          frame_data->clear_color.b, 0.f);
             glClear(GL_COLOR_BUFFER_BIT);
+             */
         }
-        
+        /*
         render_meshes(frame_data,aspect,data);
         glDisable(GL_DEPTH_TEST);
+         */
         
         render_quads(frame_data,scale,aspect,data);
     }
+    graphics_end_render_pass(data->graphics);
 }
 
 void render_to_memory(int w, int h, unsigned char *pixels,
     struct FrameData *frame_data, struct GameData *data)
 {
+    //BOOKMARK(Vidar): OpenGL
+    /*
 	float old_window_min_x = data->window_min_x;
 	float old_window_max_x = data->window_max_x;
 	float old_window_min_y = data->window_min_y;
@@ -1991,10 +1996,10 @@ void render_to_memory(int w, int h, unsigned char *pixels,
         data->window_max_y += pad;
     }
 
-    GLuint FramebufferName = 0;
+    uint32_t FramebufferName = 0;
     glGenFramebuffers(1, &FramebufferName);
     glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
-    GLuint renderedTexture;
+    uint32_t renderedTexture;
     glGenTextures(1, &renderedTexture);
     glBindTexture(GL_TEXTURE_2D, renderedTexture);
     glTexImage2D(GL_TEXTURE_2D, 0,GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
@@ -2015,11 +2020,14 @@ void render_to_memory(int w, int h, unsigned char *pixels,
 	data->window_max_x = old_window_max_x;
 	data->window_min_y = old_window_min_y;
 	data->window_max_y = old_window_max_y;
+    */
 }
 
 void render_to_memory_float(int w, int h, float *pixels,
     struct FrameData *frame_data, struct GameData *data)
 {
+    //BOOKMARK(Vidar): OpenGL
+    /*
 	float old_window_min_x = data->window_min_x;
 	float old_window_max_x = data->window_max_x;
 	float old_window_min_y = data->window_min_y;
@@ -2038,10 +2046,10 @@ void render_to_memory_float(int w, int h, float *pixels,
     }
 
 
-    GLuint FramebufferName = 0;
+    uint32_t FramebufferName = 0;
     glGenFramebuffers(1, &FramebufferName);
     glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
-    GLuint renderedTexture;
+    uint32_t renderedTexture;
     glGenTextures(1, &renderedTexture);
     glBindTexture(GL_TEXTURE_2D, renderedTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, 0);
@@ -2065,14 +2073,17 @@ void render_to_memory_float(int w, int h, float *pixels,
 	data->window_max_x = old_window_max_x;
 	data->window_min_y = old_window_min_y;
 	data->window_max_y = old_window_max_y;
+     */
 }
 
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data)
 {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    //BOOKMARK(Vidar):OpenGL
+    
+    //glBindFramebuffer(GL_FRAMEBUFFER, 0);
     render_internal(framebuffer_w, framebuffer_h, data->frame_data, data);
     
-    float min_size =
+    /*float min_size =
         (float)(framebuffer_w > framebuffer_h ? framebuffer_h : framebuffer_w);
     float pad = fabsf((float)(framebuffer_w - framebuffer_h))*0.5f/min_size;
     data->window_min_x = 0.f; data->window_max_x = 1.f;
@@ -2084,6 +2095,7 @@ void render(int framebuffer_w, int framebuffer_h, struct GameData *data)
         data->window_min_y -= pad;
         data->window_max_y += pad;
     }
+     */
 }
 
 int update(int ticks, struct InputState input_state, struct GameData *data)

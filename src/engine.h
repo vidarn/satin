@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "linalg/linalg.h"
+#include "renderer.h"
 struct GameData;
 struct InputState;
 struct RenderContext;
@@ -34,33 +35,6 @@ enum BlendMode {
 
 extern int reference_resolution;
 
-struct Shader;
-#define SHADER_UNIFORM_TYPES \
-SHADER_UNIFORM_TYPE(INT,    1,sizeof(int), GL_INT)\
-SHADER_UNIFORM_TYPE(FLOAT,  1,sizeof(float), GL_FLOAT)\
-SHADER_UNIFORM_TYPE(MAT4,  16,sizeof(float), GL_FLOAT)\
-SHADER_UNIFORM_TYPE(MAT3,   9,sizeof(float), GL_FLOAT)\
-SHADER_UNIFORM_TYPE(VEC4,   4,sizeof(float), GL_FLOAT)\
-SHADER_UNIFORM_TYPE(VEC3,   3,sizeof(float), GL_FLOAT)\
-SHADER_UNIFORM_TYPE(VEC2,   2,sizeof(float), GL_FLOAT)\
-SHADER_UNIFORM_TYPE(HALF,   1,            2, GL_HALF_FLOAT)\
-SHADER_UNIFORM_TYPE(HALF2,  2,            2, GL_HALF_FLOAT)\
-SHADER_UNIFORM_TYPE(HALF3,  3,            2, GL_HALF_FLOAT)\
-SHADER_UNIFORM_TYPE(TEX2,   1,sizeof(int), GL_INT)\
-SHADER_UNIFORM_TYPE(SPRITE, 1,sizeof(int), GL_INT)\
-SHADER_UNIFORM_TYPE(SPRITE_POINTER, 1, sizeof(void *), GL_INT)
-
-enum ShaderUniformType{
-#define SHADER_UNIFORM_TYPE(name,num,size,gl_type) SHADER_UNIFORM_##name,
-    SHADER_UNIFORM_TYPES
-#undef SHADER_UNIFORM_TYPE
-};
-struct ShaderUniform{
-    char *name;
-    enum ShaderUniformType type;
-    int num;
-    void *data;
-};
 
 void get_window_extents(float *x_min, float *x_max, float *y_min, float *y_max,
     struct GameData *data);
@@ -88,20 +62,25 @@ void render_line_screen(float x1, float y1, float x2, float y2, float thickness,
 void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
     struct Color color, struct RenderContext *context);
 
-void render_mesh(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
-                 int num_uniforms, struct RenderContext *context);
-void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
-	int num_uniforms, void(*callback)(void *param), void *callback_param, struct RenderContext *context);
+void render_mesh(int mesh, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
+                 int num_uniforms, struct RenderContext *context)
+;
+void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
+	int num_uniforms, void(*callback)(void *param), void *callback_param, struct RenderContext *context)
+;
 
-void render_quad(int shader, struct Matrix3 m, struct ShaderUniform *uniforms,
-    int num_uniforms, struct RenderContext *context);
+void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniforms,
+    int num_uniforms, struct RenderContext *context)
+;
 
 void render_sprite_screen(int sprite,float x, float y,
-    struct RenderContext *context);
+    struct RenderContext *context)
+;
 void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
-    struct RenderContext *context);
+    struct RenderContext *context)
+;
 void render_sprite_screen_scaled_with_shader(int sprite,float x, float y,
-    float scale, int shader, struct ShaderUniform *uniforms, int num_uniforms,
+    float scale, int shader, struct GraphicsValueSpec *uniforms, int num_uniforms,
     struct RenderContext *context)
 ;
 
@@ -130,14 +109,8 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
 	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
 	int *tri_data, int shader, struct GameData *data);
 
-struct CustomMeshDataSpec
-{
-	unsigned char *data;
-	const char *name;
-	enum ShaderUniformType type;
-};
 int load_custom_mesh_from_memory(int num_verts, int num_tris,
-	int *tri_data, int shader, struct GameData *data, int num_data_specs, struct CustomMeshDataSpec *data_spec)
+int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct GameData *data)
 ;
 
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data);
@@ -145,8 +118,9 @@ void calculate_mesh_normals(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, int num_tris, int *tri_data);
 void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
     struct Vec3 *normal_data, struct Vec2 *uv_data, struct GameData *data);
-void update_custom_mesh_verts_from_memory(int mesh, int num_data_spect, struct CustomMeshDataSpec *data_spec,
-	struct GameData *data);
+void update_custom_mesh_verts_from_memory(int mesh, int num_data_specs, struct GraphicsValueSpec *data_spec,
+                                          struct GameData *data)
+;
 int get_mesh_num_verts(int mesh, struct GameData *data);
 void get_mesh_vert_data(int mesh, struct Vec3 *pos_data, struct Vec3 *normal_data,
     struct Vec2 *uv_data, struct GameData *data);
@@ -162,10 +136,11 @@ void resize_image_from_memory(int sprite, int sprite_w, int sprite_h, unsigned c
 	struct GameData *data)
 ;
 
-int load_shader(const char* vert_filename,const char * frag_filename,
-    struct GameData *data, ...);
+int load_shader(const char* vert_filename, const char * frag_filename, struct GameData *data)
+;
 int load_shader_from_string(const char* vert_source, const char * frag_source,
-	struct GameData *data);
+	struct GameData *data)
+;
 
 int get_mean_ticks(int length, struct GameData *data);
 int get_tick_length(struct GameData *data);

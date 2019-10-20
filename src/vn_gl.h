@@ -144,8 +144,10 @@ static struct Shader compile_shader_filename_vararg(const char* vert_source,cons
 		return ret;
 	}
 
+    /* BOOKMARK(Vidar): OpenGL call
 	ret.shader = compile_shader(vert_s,frag_s,error_buffer,error_buffer_len,
         glsl_version_string);
+     */
     /*
 	if(ret.shader!=-1){
 		char *s=va_arg(args,char*);

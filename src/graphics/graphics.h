@@ -19,7 +19,7 @@ struct RenderString{
 };
 
 struct RenderMesh{
-    struct ShaderUniform *uniforms;
+    struct GraphicsValueSpec *uniforms;
 	void (*callback)(void *param);
 	void *callback_param;
     float m[16];
@@ -38,7 +38,7 @@ struct RenderLine{
 };
 
 struct RenderQuad{
-    struct ShaderUniform *uniforms;
+    struct GraphicsValueSpec *uniforms;
 	//NOTE(Vidar):This is a matrix3
 	//TODO(Vidar):Handle this better
     float ALIGNED_(32) m[9];

@@ -27,8 +27,10 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 
 void *os_data_create(void);
 void os_data_set_data_folder_name(void *os_data, char *path);
+struct GraphicsData;
+struct GraphicsData *os_data_get_graphics(void *os_data);
 char **get_args(int *argc);
-char *get_cwd();
+char *get_cwd(void);
 
 enum OS_LIST_ENTRIES_TYPE {
 	OS_LIST_ENTRIES_TYPE_FOLDER = 1,
