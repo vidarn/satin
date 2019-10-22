@@ -12,6 +12,8 @@ void main()
     vec4 pos = model_matrix * vec4(pos,1.f);
     pos_out = pos.xyz;
 	gl_Position = view_matrix * pos;
-    normal_out = normal;
+
+	//NOTE(Vidar): Assume that the model matrix is orthogonal
+    normal_out = (model_matrix * vec4(normal,0.f)).xyz;
     uv_map_out = uv_map;
 }
