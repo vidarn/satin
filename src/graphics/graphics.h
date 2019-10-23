@@ -1,5 +1,6 @@
 #pragma once
 #include "compiler_features/compiler_features.h"
+#include "memory/buffer.h"
 struct FrameData;
 
 struct Sprite;
@@ -28,6 +29,7 @@ struct RenderMesh{
     int num_uniforms;
 	int depth_test;
     enum BlendMode blend_mode;
+	int scissor_state;
 };
 
 struct RenderLine{
@@ -46,6 +48,7 @@ struct RenderQuad{
     int num_uniforms;
     int shader;
     enum BlendMode blend_mode;
+	int scissor_state;
 };
 
 #define render_sprite_list_size 2048
@@ -83,6 +86,7 @@ struct FrameData{
     struct RenderLineList   render_line_list;
     struct RenderMeshList   render_mesh_list;
     struct RenderQuadList   render_quad_list;
+	struct Buffer* scissor_states;
     int clear;
     struct Color clear_color;
 };

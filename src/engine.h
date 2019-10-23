@@ -105,6 +105,9 @@ void render_sprite_screen_scaled_with_shader(int sprite,float x, float y,
     struct RenderContext *context)
 ;
 
+void set_scissor_state(int enabled, float x1, float y1, float x2, float y2, struct RenderContext* context)
+;
+
 void render_to_memory(int w, int h, unsigned char *pixels,
     struct FrameData *frame_data, struct GameData *data);
 void render_to_memory_float(int w, int h, float *pixels,
