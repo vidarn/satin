@@ -1858,11 +1858,22 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
 				struct ScissorState s = scissor_states[render_mesh->scissor_state];
 				if (s.enabled) {
 					glEnable(GL_SCISSOR_TEST);
+					float s_w = s.x2 - s.x1;
+					float s_h = s.y2 - s.y1;
+					if (aspect > 1.f) {
+						s.x1 += (aspect - 1.f) * 0.5f;
+						s.x1 /= aspect;
+						s_w  /= aspect;
+					}
+					if (aspect < 1.f) {
+						s.y1 = (s.y1*aspect +(1.f - aspect) * 0.5f);
+						s_h  *= aspect;
+					}
 					glScissor(
 						(int)((float)w * s.x1),
 						(int)((float)h * s.y1),
-						(int)((float)w * (s.x2 - s.x1)),
-						(int)((float)h * (s.y2 - s.y1))
+						(int)((float)w * s_w),
+						(int)((float)h * s_h)
 					);
 				}
 				else {
