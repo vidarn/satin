@@ -40,6 +40,13 @@ enum GraphicsPixelFormat{
     GRAPHICS_PIXEL_FORMAT_COUNT
 };
 
+
+enum GraphicsBlendMode {
+    GRAPHICS_BLEND_MODE_PREMUL,
+    GRAPHICS_BLEND_MODE_MULTIPLY,
+    GRAPHICS_BLEND_MODE_NONE,
+};
+
 extern int graphics_value_sizes[];
 extern int graphics_value_nums[];
 
@@ -53,14 +60,18 @@ void graphics_end_render_pass(struct GraphicsData *graphics)
 ;
 void graphics_clear(struct GraphicsData *graphics)
 ;
+
 void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader, struct GraphicsValueSpec *uniform_specs, int num_uniform_specs, struct GraphicsData *graphics)
 ;
 
-struct Shader *graphics_compile_shader(const char *vert_filename, const char *frag_filename, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics)
+struct Shader *graphics_compile_shader(const char *vert_filename, const char *frag_filename, enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics)
 ;
 
 struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_t num_value_specs, uint32_t num_verts, int *index_data, uint32_t num_indices, struct GraphicsData *graphics)
 ;
 
 struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint32_t h, uint32_t format, struct GraphicsData *graphics)
+;
+
+void graphics_set_depth_test(int enabled, struct GraphicsData *graphics)
 ;

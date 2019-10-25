@@ -157,7 +157,6 @@ void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniform
         r->uniforms[0].type = GRAPHICS_VALUE_MAT3;
         r->uniforms[0].data = r->m;
     }
-    r->blend_mode = context->blend_mode;
 }
 
 //TODO(Vidar):Should we be able to specity the anchor point when rendering
@@ -422,9 +421,6 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
         render_mesh.uniforms[i+2].data = calloc(1,size);
         memcpy(render_mesh.uniforms[i+2].data, uniforms[i].data, size);
     }
-    
-    
-    render_mesh.blend_mode = context->blend_mode;
     
     struct RenderMeshList * rml = &context->frame_data->render_mesh_list;
     while(rml->num >= render_sprite_list_size){
@@ -996,10 +992,10 @@ unsigned int get_mesh_vertex_buffer(int mesh, struct GameData *data)
 #define ERROR_BUFFER_LEN 512
 
 int load_shader(const char* vert_filename,
-    const char * frag_filename, struct GameData *data)
+    const char * frag_filename, enum GraphicsBlendMode blend_mode, struct GameData *data)
 {
     char error_buffer[ERROR_BUFFER_LEN] = {0};
-    struct Shader *shader = graphics_compile_shader(vert_filename, frag_filename, error_buffer, ERROR_BUFFER_LEN, data->graphics);
+    struct Shader *shader = graphics_compile_shader(vert_filename, frag_filename, blend_mode, error_buffer, ERROR_BUFFER_LEN, data->graphics);
     if(error_buffer[0] != 0){
         printf("Shader compilation error:\n%s\n",error_buffer);
     }
@@ -1212,9 +1208,9 @@ int load_font(const char *name, double font_size, struct GameData *data)
         font_rgba[i*4+2]=(unsigned char)((float)font_bitmap[i]);
         font_rgba[i*4+3]=(unsigned char)((float)font_bitmap[i]);
     }
-    /*BOOKMARK(Vidar): OpenGL
+
     font->texture =
-        add_texture(font_rgba, font_bitmap_size, font_bitmap_size,GL_RGBA,data);
+        add_texture(font_rgba, font_bitmap_size, font_bitmap_size,GRAPHICS_PIXEL_FORMAT_RGBA,data);
     //NOTE(Vidar): Create sprites from each baked_char...
     float inv_w = 1.f/(float)font_bitmap_size;
     float inv_h = 1.f/(float)font_bitmap_size;
@@ -1240,8 +1236,6 @@ int load_font(const char *name, double font_size, struct GameData *data)
     free(font_bitmap);
     free(font_rgba);
     return ret;
-     */
-    return 0;
 }
 
 //TODO(Vidar):Pad the sprites
@@ -1579,8 +1573,8 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     data->game_state_types = calloc(num_game_states,sizeof(struct GameState));
 	memcpy(data->game_state_types, game_states, num_game_states * sizeof(struct GameState));
     
-    data->line_shader = load_shader("line", "line" , data);
-    data->sprite_shader = load_shader("sprite", "sprite" , data);
+    data->line_shader = load_shader("line", "line", GRAPHICS_BLEND_MODE_PREMUL , data);
+    data->sprite_shader = load_shader("sprite", "sprite", GRAPHICS_BLEND_MODE_PREMUL , data);
     {
         struct GraphicsValueSpec data_specs[] = {
             {"pos", (uint8_t *)quad_render_data, GRAPHICS_VALUE_VEC2}
@@ -1798,6 +1792,7 @@ void render_meshes(struct FrameData *frame_data, float aspect,
 	int current_depth_test_state = 1;
     enum BlendMode blend_mode = BLEND_MODE_NONE;
      */
+    graphics_set_depth_test(1,data->graphics);
     struct RenderMeshList *rml = &frame_data->render_mesh_list;
     while(rml != 0){
         for(int i=0;i<rml->num;i++){
@@ -1884,6 +1879,7 @@ void render_meshes(struct FrameData *frame_data, float aspect,
 void render_quads(struct FrameData *frame_data, float scale, float aspect,
     struct GameData *data)
 {
+    graphics_set_depth_test(0,data->graphics);
     struct RenderQuadList *list = &frame_data->render_quad_list;
     while(list != 0){
         for(int i=0;i<list->num;i++){

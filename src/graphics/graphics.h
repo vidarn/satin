@@ -28,7 +28,6 @@ struct RenderMesh{
     int shader;
     int num_uniforms;
 	int depth_test;
-    enum BlendMode blend_mode;
 };
 
 struct RenderLine{
@@ -46,7 +45,6 @@ struct RenderQuad{
 	float pad[7];
     int num_uniforms;
     int shader;
-    enum BlendMode blend_mode;
 };
 
 #define render_sprite_list_size 2048

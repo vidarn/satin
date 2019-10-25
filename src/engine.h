@@ -27,12 +27,6 @@ struct Color {
     float r,g,b,a;
 };
 
-enum BlendMode {
-    BLEND_MODE_PREMUL,
-    BLEND_MODE_MULTIPLY,
-    BLEND_MODE_NONE,
-};
-
 extern int reference_resolution;
 
 
@@ -135,7 +129,7 @@ void resize_image_from_memory(int sprite, int sprite_w, int sprite_h, unsigned c
 	struct GameData *data)
 ;
 
-int load_shader(const char* vert_filename, const char * frag_filename, struct GameData *data)
+int load_shader(const char* vert_filename, const char * frag_filename, enum GraphicsBlendMode blend_mode, struct GameData *data)
 ;
 int load_shader_from_string(const char* vert_source, const char * frag_source,
 	struct GameData *data)
@@ -230,7 +224,7 @@ struct RenderContext
     struct Matrix4 camera_3d;
     struct Matrix3 camera_2d;
 	int disable_depth_test;
-    enum BlendMode blend_mode;
+    enum GraphicsBlendMode blend_mode;
 };
 
 
