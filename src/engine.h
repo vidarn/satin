@@ -62,10 +62,10 @@ void render_line_screen(float x1, float y1, float x2, float y2, float thickness,
 void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
     struct Color color, struct RenderContext *context);
 
-void render_mesh(int mesh, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
+void render_mesh(int mesh, int shader, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
                  int num_uniforms, struct RenderContext *context)
 ;
-void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
+void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
 	int num_uniforms, void(*callback)(void *param), void *callback_param, struct RenderContext *context)
 ;
 
@@ -99,8 +99,7 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
     unsigned char *sprite_data, struct GameData *data);
 int load_sprite(const char *name, struct GameData *data);
 int load_sprite_from_filename(const char *filename, struct GameData *data);
-int load_mesh(const char *name, int shader,
-    struct GameData *data);
+int load_mesh(const char *name, struct GameData *data);
 int load_mesh_unit_plane(int shader, struct GameData *data);
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     struct Vec3 *normal_data, struct Vec2 *uv_data, int num_faces,

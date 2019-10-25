@@ -69,8 +69,8 @@ struct GameData{
 	//uint32_t quad_vertex_array;
 	//uint32_t quad_vertex_buffer;
     struct Mesh *quad_mesh;
-    uint32_t *texture_ids;
-    int num_texture_ids;
+    struct Texture **textures;
+    int num_textures;
     struct Shader **shaders;
     int num_shaders;
     struct Mesh **meshes;
@@ -168,24 +168,6 @@ static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y
     struct GraphicsValueSpec *uniforms_arg, int num_uniforms_arg,
     struct RenderContext *context)
 {
-
-    /*
-    struct RenderSpriteList * rsl = &context->frame_data->render_sprite_list;
-    //TODO(Vidar):Handle the case when the list of render lines is full...
-    while(rsl->num >= render_sprite_list_size){
-        if(rsl->next == 0){
-            rsl->next = calloc(1,sizeof(struct RenderSpriteList));
-        }
-        rsl = rsl->next;
-    }
-    struct RenderSprite * r = rsl->sprites + rsl->num;
-    rsl->num++;
-    r->pos[0] = x*2.f-1.f;
-    r->pos[1] = y*2.f-1.f;
-    r->sprite = sprite;
-    r->override_width = override_width;
-    r->width = width;
-     */
     float sprite_scale = 1.f/(float)reference_resolution;
     float w = width*sprite_scale*0.5f;
     float h = w*sprite->inv_aspect;
@@ -195,10 +177,11 @@ static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y
         x+context->offset_x, y+context->offset_y, 1.0f,
     };
     struct GraphicsValueSpec uniforms[32] = {
-        {"sprite",  &sprite,      GRAPHICS_VALUE_SPRITE_POINTER, 1},
         {"color",   &color,     GRAPHICS_VALUE_VEC4, 1},
+        {"sprite_uv",  sprite->uv_offset,    GRAPHICS_VALUE_VEC4, 1},
+        {"sprite",  context->data->textures[sprite->texture],    GRAPHICS_VALUE_TEX2, 1},
     };
-    int num_uniforms = 2;
+    int num_uniforms = 3;
     for(int i=0;i<num_uniforms_arg;i++){
         uniforms[i+num_uniforms] = uniforms_arg[i];
     }
@@ -410,13 +393,13 @@ void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
     render_line_screen(x1, y2, x2, y2, thickness, color, context);
 }
 
-void render_mesh(int mesh, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
+void render_mesh(int mesh, int shader, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
 	int num_uniforms, struct RenderContext *context)
 {
-	render_mesh_with_callback(mesh, mat, uniforms, num_uniforms, 0, 0, context);
+	render_mesh_with_callback(mesh, shader, mat, uniforms, num_uniforms, 0, 0, context);
 }
 
-void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
+void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
     int num_uniforms, void(*callback)(void *param), void *callback_param, struct RenderContext *context)
 {
     struct RenderMesh render_mesh = {0};
@@ -424,20 +407,23 @@ void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct GraphicsValu
 	render_mesh.callback_param = callback_param;
 	render_mesh.depth_test = !context->disable_depth_test;
     render_mesh.mesh = mesh;
-    *(struct Matrix4*)&render_mesh.m = mat;
-    *(struct Matrix4*)&render_mesh.cam = context->camera_3d;
+    render_mesh.shader = shader;
+    num_uniforms += 2;
+
     render_mesh.num_uniforms = num_uniforms;
     //TODO(Vidar):Can we avoid allocating memory??
     render_mesh.uniforms = calloc(num_uniforms*sizeof(struct GraphicsValueSpec),1);
-    for(int i=0;i<num_uniforms;i++){
+    for(int i=0;i<num_uniforms-2;i++){
         enum GraphicsValueType type = uniforms[i].type;
         int size = graphics_value_sizes[type]*uniforms[i].num;
-        render_mesh.uniforms[i].name = strdup(uniforms[i].name);
-        render_mesh.uniforms[i].type = type;
-        render_mesh.uniforms[i].num = uniforms[i].num;
-        render_mesh.uniforms[i].data = calloc(1,size);
-        memcpy(render_mesh.uniforms[i].data, uniforms[i].data, size);
+        render_mesh.uniforms[i+2].name = strdup(uniforms[i].name);
+        render_mesh.uniforms[i+2].type = type;
+        render_mesh.uniforms[i+2].num = uniforms[i].num;
+        render_mesh.uniforms[i+2].data = calloc(1,size);
+        memcpy(render_mesh.uniforms[i+2].data, uniforms[i].data, size);
     }
+    
+    
     render_mesh.blend_mode = context->blend_mode;
     
     struct RenderMeshList * rml = &context->frame_data->render_mesh_list;
@@ -447,15 +433,29 @@ void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct GraphicsValu
         }
         rml = rml->next;
     }
-    rml->meshes[rml->num] = render_mesh;
+    struct RenderMesh *rm = rml->meshes + rml->num;
+    *rm = render_mesh;
     rml->num++;
+    
+    *(struct Matrix4*)&rm->m = mat;
+    *(struct Matrix4*)&rm->cam = context->camera_3d;
+    rm->uniforms[0].name = "model_matrix";
+    rm->uniforms[0].type = GRAPHICS_VALUE_MAT4;
+    rm->uniforms[0].num = 1;
+    rm->uniforms[0].data = rm->m;
+    rm->uniforms[1].name = "view_matrix";
+    rm->uniforms[1].type = GRAPHICS_VALUE_MAT4;
+    rm->uniforms[1].num = 1;
+    rm->uniforms[1].data = rm->cam;
 }
 
 static int add_texture(unsigned char *sprite_data, int sprite_w, int sprite_h,
     int32_t format, struct GameData *data)
 {
-    data->texture_ids = realloc(data->texture_ids, (data->num_texture_ids+1)*
-                                sizeof(uint32_t));
+    int tex_index = data->num_textures;
+    data->textures = realloc(data->textures,(++data->num_textures)
+        *sizeof(struct Texture *));
+    data->textures[tex_index] = graphics_create_texture(sprite_data,sprite_w, sprite_h, format, data->graphics);;
     /* BOOKMARK(Vidar): OpenGL call
 	glGenTextures(1, data->texture_ids + data->num_texture_ids);
     glActiveTexture(GL_TEXTURE0);
@@ -467,8 +467,7 @@ static int add_texture(unsigned char *sprite_data, int sprite_w, int sprite_h,
     glTexImage2D(GL_TEXTURE_2D, 0,format, sprite_w, sprite_h,
         0, format, GL_UNSIGNED_BYTE, sprite_data);
      */
-    data->num_texture_ids++;
-    return data->num_texture_ids - 1;
+    return tex_index;
 }
 
 int create_render_texture(int w, int h, int32_t format, struct GameData *data)
@@ -517,8 +516,7 @@ static int compare_tinyobj_vert_index(void *a, void*b, void *data)
     }
 }
 
-int load_mesh(const char *name, int shader,
-    struct GameData *data)
+int load_mesh(const char *name, struct GameData *data)
 {
     //TODO(Vidar):Don't use obj!!
     FILE *fp=open_file(name,".obj","rb",data);
@@ -543,9 +541,6 @@ int load_mesh(const char *name, int shader,
             buf,len,flags);
         free(buf);
 
-        struct Mesh *mesh;
-        
-        
         //TODO(Vidar): Copy and sort attrib.faces.
         len = attrib.num_face_num_verts*3*sizeof(tinyobj_vertex_index_t);
         tinyobj_vertex_index_t *faces = calloc(len,1);
@@ -605,6 +600,34 @@ int load_mesh(const char *name, int shader,
             }
         }
         
+        int num_tris = attrib.num_face_num_verts;
+        int index_data_len = num_tris*3*sizeof(int);
+        int *index_data=calloc(index_data_len,1);
+        for(int i=0;i<num_tris*3;i++){
+            index_data[i] = vert_to_unique_vert[i];
+        }
+
+        free(faces);
+        free(faces_tmp);
+        free(idx);
+        free(idx_tmp);
+        free(vert_to_unique_vert);
+        
+        struct GraphicsValueSpec data_specs[] = {
+            {"pos", (uint8_t *)vertex_data, GRAPHICS_VALUE_VEC3},
+            {"normal", (uint8_t *)normal_data, GRAPHICS_VALUE_VEC3},
+            {"uv", (uint8_t *)uv_map_data, GRAPHICS_VALUE_VEC2}
+        };
+        int num_data_specs = sizeof(data_specs)/sizeof(*data_specs);
+        
+        int ret =  load_custom_mesh_from_memory(num_verts, num_tris, index_data,
+            num_data_specs, data_specs, data);
+        
+        free(index_data);
+        free(vertex_data);
+        
+        return ret;
+        
         /* BOOKMARK(Vidar): OpenGL
         mesh.num_tris = attrib.num_face_num_verts;
         int index_data_len = mesh.num_tris*3*sizeof(int);
@@ -660,12 +683,6 @@ int load_mesh(const char *name, int shader,
         glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,index_data,
             GL_STATIC_DRAW);
 */
-        
-        int mesh_index = data->num_meshes;
-        data->meshes = realloc(data->meshes,(++data->num_meshes)
-            *sizeof(struct Mesh *));
-        data->meshes[mesh_index] = mesh;
-        return mesh_index;
     } else{
         printf("Could not load mesh \"%s\"\n",name);
     }
@@ -779,14 +796,9 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
 int load_custom_mesh_from_memory(int num_verts, int num_tris,
 int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct GameData *data)
 {
-
-
-    
     //BOOKMARK(Vidar):implement mesh creation
     struct Mesh *mesh = graphics_create_mesh(data_spec, num_data_specs, num_verts, tri_data, num_tris*3, data->graphics);
-    
-    
-    
+
     /*BOOKMARK(Vidar): OpenGL
     glGenVertexArrays(1,&mesh.vertex_array);
     glBindVertexArray(mesh.vertex_array);
@@ -1298,8 +1310,7 @@ void create_sprite_atlas(struct GameData *data)
         sprite_data++;
         sprite++;
     }
-    /*BOOKMARK(Vidar): OpenGL
-    int texture_id = add_texture(atlas_data,w,h,GL_RGBA,data);
+    int texture_id = add_texture(atlas_data,w,h,GRAPHICS_PIXEL_FORMAT_RGBA,data);
     sprite=data->sprites;
 	sprite_data = data->sprite_data;
     for(int i=0;i<data->num_sprites;i++){
@@ -1309,7 +1320,6 @@ void create_sprite_atlas(struct GameData *data)
         sprite_data++;
         sprite++;
     }
-    */
 }
 
 int get_mean_ticks(int length, struct GameData *data)
@@ -1388,7 +1398,9 @@ void frame_data_reset(struct FrameData *frame_data)
         while(rml != 0){
             for(int i=0;i<rml->num;i++){
                 struct RenderMesh *rm = rml->meshes + i;
-                for(int i=0;i<rm->num_uniforms;i++){
+                //NOTE(Vidar):The first two uniforms are the view and model matrices, don't
+                // try to free them!
+                for(int i=2;i<rm->num_uniforms;i++){
                     free(rm->uniforms[i].name);
                     free(rm->uniforms[i].data);
                 }
@@ -1568,13 +1580,12 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 	memcpy(data->game_state_types, game_states, num_game_states * sizeof(struct GameState));
     
     data->line_shader = load_shader("line", "line" , data);
+    data->sprite_shader = load_shader("sprite", "sprite" , data);
     {
         struct GraphicsValueSpec data_specs[] = {
             {"pos", (uint8_t *)quad_render_data, GRAPHICS_VALUE_VEC2}
         };
         int num_data_specs = sizeof(data_specs)/sizeof(*data_specs);
-        //graphics_create_mesh(data_specs, , 4, (int*)quad_render_index, sizeof(quad_render_index), data->graphics);
-        //load_custom_mesh_from_memory(4, 2, (int*)quad_render_index, num_data_specs, data_specs, data);
         data->quad_mesh = graphics_create_mesh(data_specs, num_data_specs, 4, (int*)quad_render_index, 6, data->graphics);
     }
     
@@ -1786,11 +1797,14 @@ void render_meshes(struct FrameData *frame_data, float aspect,
 	glClear(GL_DEPTH_BUFFER_BIT);
 	int current_depth_test_state = 1;
     enum BlendMode blend_mode = BLEND_MODE_NONE;
+     */
     struct RenderMeshList *rml = &frame_data->render_mesh_list;
     while(rml != 0){
         for(int i=0;i<rml->num;i++){
             struct RenderMesh *render_mesh = rml->meshes + i;
-            struct Mesh *mesh = data->meshes + render_mesh->mesh;
+            struct Mesh *mesh = data->meshes[render_mesh->mesh];
+            struct Shader *shader = data->shaders[render_mesh->shader];
+            /* BOOKMARK(Vidar): OpenGL call
             if(blend_mode != render_mesh->blend_mode){
                 if(blend_mode == BLEND_MODE_NONE){
                     glEnable(GL_BLEND);
@@ -1856,18 +1870,21 @@ void render_meshes(struct FrameData *frame_data, float aspect,
 				render_mesh->callback(render_mesh->callback_param);
 			}
             glDrawElements(GL_TRIANGLES, mesh->num_tris*3,GL_UNSIGNED_INT,(void*)0);
+             */
+            if (render_mesh->callback) {
+                render_mesh->callback(render_mesh->callback_param);
+            }
+            graphics_render_mesh(mesh, shader, render_mesh->uniforms,
+                     render_mesh->num_uniforms, data->graphics);
         }
         rml = rml->next;
     }
-     */
 }
 
 void render_quads(struct FrameData *frame_data, float scale, float aspect,
     struct GameData *data)
 {
     struct RenderQuadList *list = &frame_data->render_quad_list;
-    int shader = -1;
-    enum BlendMode blend_mode = BLEND_MODE_NONE;
     while(list != 0){
         for(int i=0;i<list->num;i++){
             struct RenderQuad render_quad = list->quads[i];
@@ -1953,7 +1970,7 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
             scale=1.f/aspect;
         }
         
-     /*BOOKMARK(Vidar):OpenG
+     /*BOOKMARK(Vidar):OpenGl
         glViewport(0, 0, w, h);
 */
         graphics_begin_render_pass(&frame_data->clear_color.r, data->graphics);
@@ -1964,10 +1981,9 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
             glClear(GL_COLOR_BUFFER_BIT);
              */
         }
-        /*
+        
         render_meshes(frame_data,aspect,data);
-        glDisable(GL_DEPTH_TEST);
-         */
+        //glDisable(GL_DEPTH_TEST);
         
         render_quads(frame_data,scale,aspect,data);
     }

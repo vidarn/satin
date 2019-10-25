@@ -25,6 +25,7 @@ struct RenderMesh{
     float m[16];
     float cam[16];
     int mesh;
+    int shader;
     int num_uniforms;
 	int depth_test;
     enum BlendMode blend_mode;
