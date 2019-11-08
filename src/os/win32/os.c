@@ -766,3 +766,15 @@ int os_does_file_exist(const char *filename)
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
 		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
+
+void save_screenshot(const char* filename)
+{
+	const char* arg = "savescreenshotfull ";
+	size_t arg_len = strlen(arg) + 1;
+	size_t filename_len = strlen(filename) + 1;
+	char* buffer = calloc(arg_len + filename_len + 32, 1);
+	sprintf(buffer, "%s %s", arg, filename);
+	ShellExecuteA(0, "open", "M:/_Common/Software/nircmd-x64/nircmdc.exe",
+		buffer, 0, SW_HIDE);
+	free(buffer);
+}
