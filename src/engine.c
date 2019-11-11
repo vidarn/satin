@@ -189,24 +189,6 @@ static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y
     struct ShaderUniform *uniforms_arg, int num_uniforms_arg,
     struct RenderContext *context)
 {
-
-    /*
-    struct RenderSpriteList * rsl = &context->frame_data->render_sprite_list;
-    //TODO(Vidar):Handle the case when the list of render lines is full...
-    while(rsl->num >= render_sprite_list_size){
-        if(rsl->next == 0){
-            rsl->next = calloc(1,sizeof(struct RenderSpriteList));
-        }
-        rsl = rsl->next;
-    }
-    struct RenderSprite * r = rsl->sprites + rsl->num;
-    rsl->num++;
-    r->pos[0] = x*2.f-1.f;
-    r->pos[1] = y*2.f-1.f;
-    r->sprite = sprite;
-    r->override_width = override_width;
-    r->width = width;
-     */
     float sprite_scale = 1.f/(float)reference_resolution;
     float w = width*sprite_scale*0.5f;
     float h = w*sprite->inv_aspect;
