@@ -54,7 +54,8 @@ void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, stru
     float mx = input_state.mouse_x*(float)reference_resolution;
     float my = (1.f-input_state.mouse_y)*(float)reference_resolution;
 	float dx = input_state.delta_x*(float)reference_resolution;
-	float dy = input_state.delta_y*(float)reference_resolution;
+	float dy = -input_state.delta_y*(float)reference_resolution;
+	float sy = input_state.scroll_delta_y;
 
     nk_input_begin(ctx);
     //nk_input_motion(ctx, mx, my);
@@ -65,6 +66,7 @@ void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, stru
     ctx->input.mouse.prev.x = mx-dx;
     ctx->input.mouse.prev.y = my-dy;
     nk_input_button(ctx, NK_BUTTON_LEFT, mx, my, input_state.mouse_down);
+	ctx->input.mouse.scroll_delta = nk_vec2(0.f,sy);
     //TODO(Vidar): Provide more input info
 
 	for (int i = 0; i < input_state.num_keys_typed; i++) {
@@ -127,6 +129,7 @@ struct nk_command_##name *name = (struct nk_command_##name *)cmd;
             scissor_y1 = get_coord(scissor->y);
             scissor_x2 = scissor_x1 + get_coord(scissor->w);
             scissor_y2 = scissor_y1 - get_coord(scissor->h);
+			//set_scissor_state(1, scissor_x1, scissor_y1, scissor_x2, scissor_y2, context);
         NK_COMMAND_CASE_END
         NK_COMMAND_CASE_BEGIN(LINE, line)
             float x1 = get_coord(line->begin.x);
