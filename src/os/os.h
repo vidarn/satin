@@ -3,10 +3,10 @@
 #include <inttypes.h>
 
 struct GameData;
-struct GameState;
+struct OSData;
 
 char *get_file_path(const char *filename, const char *extension);
-FILE *open_file(const char *filename, const char *extension, const char *mode, struct GameData *data);
+FILE *open_file(const char *filename, const char *extension, const char *mode, stuct OSData *os_data);
 char *get_save_file_name(const char *title);
 char *get_open_file_name(const char *title);
 uint64_t get_current_tick(void);
@@ -21,14 +21,9 @@ int os_is_path_valid(char *path);
 
 int atomic_increment_int32(int *a);
 
-void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console,
-	int num_game_states, void *param, struct GameState *game_states, int debug_mode, void *os_data)
-;
 
-void *os_data_create(void);
-void os_data_set_data_folder_name(void *os_data, char *path);
-struct GraphicsData;
-struct GraphicsData *os_data_get_graphics(void *os_data);
+struct OSData *os_data_create(void);
+void os_data_set_data_folder_name(struct OSData *os_data, char *path);
 char **get_args(int *argc);
 char *get_cwd(void);
 

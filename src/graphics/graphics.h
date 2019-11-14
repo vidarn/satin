@@ -1,87 +1,79 @@
 #pragma once
-#include "compiler_features/compiler_features.h"
-struct FrameData;
 
-struct Sprite;
 
-struct RenderSprite{
-    struct Sprite *sprite;
-    float pos[2];
-    float width;
-    float override_width;
-    int render_pass;
+struct GraphicsData
+;
+struct Shader
+;
+struct Mesh
+;
+struct Texture
+;
+
+//TODO(Vidar):struct that is Mesh + Shader???
+
+#define GRAPHICS_VALUE_TYPES \
+GRAPHICS_VALUE_TYPE(INT,    1,sizeof(int))\
+GRAPHICS_VALUE_TYPE(FLOAT,  1,sizeof(float))\
+GRAPHICS_VALUE_TYPE(MAT4,  16,sizeof(float))\
+GRAPHICS_VALUE_TYPE(MAT3,   9,sizeof(float))\
+GRAPHICS_VALUE_TYPE(VEC4,   4,sizeof(float))\
+GRAPHICS_VALUE_TYPE(VEC3,   3,sizeof(float))\
+GRAPHICS_VALUE_TYPE(VEC2,   2,sizeof(float))\
+GRAPHICS_VALUE_TYPE(HALF,   1,            2)\
+GRAPHICS_VALUE_TYPE(HALF2,  2,            2)\
+GRAPHICS_VALUE_TYPE(HALF3,  3,            2)\
+GRAPHICS_VALUE_TYPE(TEX2,   1,sizeof(struct Texture))
+
+enum GraphicsValueType{
+#define GRAPHICS_VALUE_TYPE(name,num,size) GRAPHICS_VALUE_##name,
+    GRAPHICS_VALUE_TYPES
+#undef GRAPHICS_VALUE_TYPE
 };
-
-struct RenderString{
-    char *str;
-    int font;
-    float x, y;
-};
-
-struct RenderMesh{
-    struct GraphicsValueSpec *uniforms;
-	void (*callback)(void *param);
-	void *callback_param;
-    float m[16];
-    float cam[16];
-    int mesh;
-    int shader;
-    int num_uniforms;
-	int depth_test;
-};
-
-struct RenderLine{
-    float x1, y1, x2, y2;
-    float thickness;
-    float r,g,b;
-    int render_pass;
-};
-
-struct RenderQuad{
-    struct GraphicsValueSpec *uniforms;
-	//NOTE(Vidar):This is a matrix3
-	//TODO(Vidar):Handle this better
-    float ALIGNED_(32) m[9];
-	float pad[7];
-    int num_uniforms;
-    int shader;
-};
-
-#define render_sprite_list_size 2048
-struct RenderStringList{
+struct GraphicsValueSpec{
+    char *name;
+    void *data;
+    enum GraphicsValueType type;
     int num;
-    struct RenderString strings[render_sprite_list_size];
-    struct RenderStringList *next;
 };
 
-struct RenderSpriteList{
-    int num;
-    struct RenderSprite sprites[render_sprite_list_size];
-    struct RenderSpriteList *next;
+enum GraphicsPixelFormat{
+    GRAPHICS_PIXEL_FORMAT_RGBA,
+    GRAPHICS_PIXEL_FORMAT_COUNT
 };
 
-struct RenderLineList{
-    int num;
-    struct RenderLine lines[render_sprite_list_size];
-    struct RenderLineList *next;
-};
-struct RenderMeshList{
-    int num;
-    struct RenderMesh meshes[render_sprite_list_size];
-    struct RenderMeshList *next;
-};
-struct RenderQuadList{
-    int num;
-    struct RenderQuad quads[render_sprite_list_size];
-    struct RenderQuadList *next;
+
+enum GraphicsBlendMode {
+    GRAPHICS_BLEND_MODE_PREMUL,
+    GRAPHICS_BLEND_MODE_MULTIPLY,
+    GRAPHICS_BLEND_MODE_NONE,
 };
 
-struct FrameData{
-    struct RenderSpriteList render_sprite_list;
-    struct RenderStringList render_string_list;
-    struct RenderLineList   render_line_list;
-    struct RenderMeshList   render_mesh_list;
-    struct RenderQuadList   render_quad_list;
-    int clear;
-    struct Color clear_color;
-};
+extern int graphics_value_sizes[];
+extern int graphics_value_nums[];
+
+
+
+struct GraphicsData *graphics_create(void * param)
+;
+void graphics_begin_render_pass(float *clear_rgba, struct GraphicsData *graphics)
+;
+void graphics_end_render_pass(struct GraphicsData *graphics)
+;
+void graphics_clear(struct GraphicsData *graphics)
+;
+
+void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader, struct GraphicsValueSpec *uniform_specs, int num_uniform_specs, struct GraphicsData *graphics)
+;
+
+struct Shader *graphics_compile_shader(const char *vert_source, const char *frag_source, enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics)
+;
+
+struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_t num_value_specs, uint32_t num_verts, int *index_data, uint32_t num_indices, struct GraphicsData *graphics)
+;
+
+struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint32_t h, uint32_t format, struct GraphicsData *graphics)
+;
+
+void graphics_set_depth_test(int enabled, struct GraphicsData *graphics)
+;

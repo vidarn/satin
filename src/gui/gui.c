@@ -3,9 +3,6 @@
 #include <stdio.h>
 #include "os/win32/key_codes.h"
 
-//TODO(Vidar):This is only for the definition of SATIN_SHADER_SUFFIX
-#include "vn_gl.h"
-
 struct GuiFont {
     int font;
     struct GuiContext *context;
@@ -39,10 +36,10 @@ struct GuiContext *gui_init(int font, struct GameData *data)
     struct nk_user_font *nk_font = gui_load_font(font, context, data);
     nk_init_default(ctx, nk_font);
     
-    context->rect_shader = load_shader("gui" SATIN_SHADER_SUFFIX, "gui_rect" SATIN_SHADER_SUFFIX, data);
-    context->circle_shader = load_shader("gui" SATIN_SHADER_SUFFIX, "gui_circle" SATIN_SHADER_SUFFIX, data);
-    context->triangle_shader = load_shader("gui" SATIN_SHADER_SUFFIX, "gui_triangle" SATIN_SHADER_SUFFIX, data);
-    context->color_rect_shader = load_shader("gui" SATIN_SHADER_SUFFIX, "gui_color_rect" SATIN_SHADER_SUFFIX, data);
+    context->rect_shader = load_shader("gui" , "gui_rect" , GRAPHICS_BLEND_MODE_PREMUL,  data);
+    context->circle_shader = load_shader("gui" , "gui_circle" , GRAPHICS_BLEND_MODE_PREMUL, data);
+    context->triangle_shader = load_shader("gui" , "gui_triangle" , GRAPHICS_BLEND_MODE_PREMUL, data);
+    context->color_rect_shader = load_shader("gui" , "gui_color_rect" , GRAPHICS_BLEND_MODE_PREMUL, data);
     
     return context;
 }
@@ -157,11 +154,11 @@ struct nk_command_##name *name = (struct nk_command_##name *)cmd;
             struct Vec2 radius = {r/w, -r/h};
             int outline = 1;
             struct Vec2 thickness2 = {thickness/w, -thickness/h};
-            struct ShaderUniform uniforms[] = {
-                {"color", SHADER_UNIFORM_VEC3, 1, &color.r},
-                {"radius", SHADER_UNIFORM_VEC2, 1, &radius},
-                {"outline", SHADER_UNIFORM_INT, 1, &outline},
-                {"thickness", SHADER_UNIFORM_VEC2, 1, &thickness2},
+            struct GraphicsValueSpec uniforms[] = {
+                {"color", &color.r, GRAPHICS_VALUE_VEC3, 1},
+                {"radius", &radius, GRAPHICS_VALUE_VEC2, 1},
+                {"outline", &outline, GRAPHICS_VALUE_INT, 1},
+                {"thickness", &thickness2, GRAPHICS_VALUE_VEC2, 1},
             };
             int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
             render_quad(gui->rect_shader, m, uniforms, num_uniforms, context);
@@ -183,10 +180,10 @@ struct nk_command_##name *name = (struct nk_command_##name *)cmd;
             float r = get_coord(rect_filled->rounding);
             struct Vec2 radius = {r/w, -r/h};
             int outline = 0;
-            struct ShaderUniform uniforms[] = {
-                {"color", SHADER_UNIFORM_VEC3, 1, &color.r},
-                {"radius", SHADER_UNIFORM_VEC2, 1, &radius},
-                {"outline", SHADER_UNIFORM_INT, 1, &outline},
+            struct GraphicsValueSpec uniforms[] = {
+                {"color", &color.r, GRAPHICS_VALUE_VEC3, 1},
+                {"radius", &radius, GRAPHICS_VALUE_VEC2, 1},
+                {"outline", &outline, GRAPHICS_VALUE_INT, 1},
             };
             int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
             render_quad(gui->rect_shader, m, uniforms, num_uniforms, context);
@@ -208,8 +205,8 @@ struct nk_command_##name *name = (struct nk_command_##name *)cmd;
                 0.f,   h, 0.f,
                 x1,  y1, 1.f,
             };
-            struct ShaderUniform uniforms[] = {
-                {"colors", SHADER_UNIFORM_VEC4, 4, colors},
+            struct GraphicsValueSpec uniforms[] = {
+                {"colors", colors, GRAPHICS_VALUE_VEC4, 4},
             };
             int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
             render_quad(gui->color_rect_shader, m, uniforms, num_uniforms, context);
@@ -230,8 +227,8 @@ struct nk_command_##name *name = (struct nk_command_##name *)cmd;
                     0.f,   h, 0.f,
                     x1,  y1, 1.f,
                 };
-                struct ShaderUniform uniforms[] = {
-                    {"color", SHADER_UNIFORM_VEC4, 1, &color.r},
+                struct GraphicsValueSpec uniforms[] = {
+                    {"color", &color.r, GRAPHICS_VALUE_VEC4, 1},
                 };
                 int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
                 render_quad(gui->circle_shader, m, uniforms, num_uniforms, context);
@@ -270,11 +267,11 @@ struct nk_command_##name *name = (struct nk_command_##name *)cmd;
             struct Vec2 b = {(x2 - x_min)/w, (y2 - y_min)/h};
             struct Vec2 c = {(x3 - x_min)/w, (y3 - y_min)/h};
             struct Color color = get_color(triangle_filled->color);
-            struct ShaderUniform uniforms[] = {
-                {"color", SHADER_UNIFORM_VEC3, 1, &color.r},
-                {"a",     SHADER_UNIFORM_VEC2, 1, &a},
-                {"b",     SHADER_UNIFORM_VEC2, 1, &b},
-                {"c",     SHADER_UNIFORM_VEC2, 1, &c},
+            struct GraphicsValueSpec uniforms[] = {
+                {"color", &color.r, GRAPHICS_VALUE_VEC3, 1},
+                {"a", &a,     GRAPHICS_VALUE_VEC2, 1},
+                {"b", &b,     GRAPHICS_VALUE_VEC2, 1},
+                {"c", &c,     GRAPHICS_VALUE_VEC2, 1},
             };
             int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
             render_quad(gui->triangle_shader, m, uniforms, num_uniforms, context);

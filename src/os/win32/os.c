@@ -8,7 +8,7 @@
 
 #define _SATIN_OPEN_FILE_MAX_PATH_LEN PATHCCH_MAX_CCH
 
-struct Win32Data {
+struct OSData {
     WCHAR data_base_path[_SATIN_OPEN_FILE_MAX_PATH_LEN];
 	HWND hWnd;
 	HWND parent_hWnd;
@@ -17,7 +17,7 @@ struct Win32Data {
 
 char os_folder_separator = '\\';
 
-static void set_data_base_path(struct Win32Data *os_data, WCHAR *data_folder_name)
+static void set_data_base_path(struct OSData *os_data, WCHAR *data_folder_name)
 {
     HMODULE hModule = NULL;
     //HMODULE hModule=GetModuleHandleA(NULL);
@@ -32,7 +32,7 @@ static void set_data_base_path(struct Win32Data *os_data, WCHAR *data_folder_nam
 
 void *os_data_create(void)
 {
-	struct Win32Data *os_data = calloc(1, sizeof(struct Win32Data));
+	struct OSData *os_data = calloc(1, sizeof(struct OSData));
 	set_data_base_path(os_data, L"data/");
 	return os_data;
 }
@@ -46,12 +46,12 @@ void os_data_set_data_folder_name(void *os_data, char *path)
 	free(buffer);
 }
 
-FILE *open_file(const char *filename,const char *extension,const char *mode, struct GameData *data)
+FILE *open_file(const char *filename,const char *extension,const char *mode, void *os_data)
 {
     WCHAR path_w[_SATIN_OPEN_FILE_MAX_PATH_LEN];
 
-	struct Win32Data *os_data = (struct Win32Data *)get_os_data(data);
-	memcpy(path_w, os_data->data_base_path, _SATIN_OPEN_FILE_MAX_PATH_LEN * sizeof(WCHAR));
+	struct OSData *win_data = os_data;
+	memcpy(path_w, win_data->data_base_path, _SATIN_OPEN_FILE_MAX_PATH_LEN * sizeof(WCHAR));
 
 	size_t path_len = wcslen(path_w);
 	size_t filename_len = 0;
@@ -341,12 +341,12 @@ error_message_callback(GLenum source,
 
 void win32_set_parent_window(void *os_data, HWND parent_hWnd)
 {
-	((struct Win32Data*)os_data)->parent_hWnd = parent_hWnd;
+	((struct OSData*)os_data)->parent_hWnd = parent_hWnd;
 }
 
 void win32_set_icon(void *os_data, HICON icon)
 {
-	((struct Win32Data*)os_data)->icon = icon;
+	((struct OSData*)os_data)->icon = icon;
 }
 
 #include <Xinput.h>
@@ -379,7 +379,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 	if (!os_data) {
 		os_data = os_data_create();
 	}
-	struct Win32Data *win32_data = os_data;
+	struct OSData *win32_data = os_data;
 	hWnd = CreateOpenGLWindow(window_title, 0, 0, &window_proc_params, PFD_TYPE_RGBA, 0,
 		win32_data->parent_hWnd,
 		win32_data->icon);

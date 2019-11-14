@@ -1,5 +1,4 @@
 #include "engine.h"
-//#include "vn_gl.h"
 #define STB_IMAGE_IMPLEMENTATION
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -19,7 +18,7 @@
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "tinyobj_loader_c.h"
 #include "sort/sort.h"
-#include "graphics.h"
+#include "renderer/renderer.h"
 #include "os/os.h"
 
 //#include <immintrin.h>
@@ -96,7 +95,7 @@ struct GameData{
     float window_min_x, window_max_x;
     float window_min_y, window_max_y;
 	int lock_cursor;
-	void *os_data;
+    struct WindowData *window_data;
 	int debug_mode;
     struct GraphicsData *graphics;
 };
@@ -795,37 +794,6 @@ int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct G
     //BOOKMARK(Vidar):implement mesh creation
     struct Mesh *mesh = graphics_create_mesh(data_spec, num_data_specs, num_verts, tri_data, num_tris*3, data->graphics);
 
-    /*BOOKMARK(Vidar): OpenGL
-    glGenVertexArrays(1,&mesh.vertex_array);
-    glBindVertexArray(mesh.vertex_array);
-    glGenBuffers(1,&mesh.vertex_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER,mesh.vertex_buffer);
-    
-    glBufferData(GL_ARRAY_BUFFER,total_data_len,vertex_data,
-                 GL_DYNAMIC_DRAW);
-    //TODO(Vidar):We should be able to free it now, right?
-    //free(vertex_data);
-	int offset = 0;
-	for (int i = 0; i < num_data_specs; i++) {
-		struct CustomGraphicsValueSpec spec = data_spec[i];
-		int loc=glGetAttribLocation(mesh.shader->shader,spec.name);
-		if(loc == -1){
-			printf("Error: Could not find \"%s\" attribute in shader\n", spec.name);
-		}
-		glEnableVertexAttribArray(loc);
-		glVertexAttribPointer(loc,uniform_nums[spec.type],uniform_gl_types[spec.type],GL_FALSE,
-			0, (void*)(intptr_t)(offset));
-		offset += uniform_sizes[spec.type]*num_verts;
-	}
-    
-    mesh.num_tris = num_tris;
-    int index_data_len = mesh.num_tris*3*sizeof(int);
-
-    glGenBuffers(1,&mesh.index_buffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,tri_data,
-                 GL_STATIC_DRAW);
-    */
     int mesh_index = data->num_meshes;
     data->meshes = realloc(data->meshes,(++data->num_meshes)
                            *sizeof(struct Mesh *));
@@ -1552,21 +1520,12 @@ float sum_values(float *values, int num)
     return sum;
 }
 
-void *get_os_data(struct GameData *data)
-{
-	return data->os_data;
-}
 
-void  set_os_data(void *os_data, struct GameData *data)
-{
-	data->os_data = os_data;
-}
-
-struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data, int debug_mode)
+struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode);
 {
     struct GameData *data = calloc(1,sizeof(struct GameData));
-	set_os_data(os_data,data);
-    data->graphics = os_data_get_graphics(os_data);
+    data->window_data = window_data;
+    data->graphics = window_get_graphics(window_data);
 	data->debug_mode = debug_mode;
 
     data->num_game_state_types = num_game_states;
@@ -1866,6 +1825,20 @@ void render_meshes(struct FrameData *frame_data, float aspect,
 			}
             glDrawElements(GL_TRIANGLES, mesh->num_tris*3,GL_UNSIGNED_INT,(void*)0);
              */
+            struct Matrix4 asp_m={0};
+            if(aspect<1.f){
+                asp_m.m[0]=1.f;
+                asp_m.m[5]=aspect;
+            } else{
+                asp_m.m[0]=1.f/aspect;
+                asp_m.m[5]=1.f;
+            }
+            asp_m.m[10]=1.f;
+            asp_m.m[15]=1.f;
+            
+            *(struct Matrix4*)&render_mesh->cam = multiply_matrix4(*(struct Matrix4*)&render_mesh->cam,asp_m);
+            
+            
             if (render_mesh->callback) {
                 render_mesh->callback(render_mesh->callback_param);
             }
@@ -1883,8 +1856,8 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect,
     struct RenderQuadList *list = &frame_data->render_quad_list;
     while(list != 0){
         for(int i=0;i<list->num;i++){
-            struct RenderQuad render_quad = list->quads[i];
-            struct Shader *quad_shader = data->shaders[render_quad.shader];
+            struct RenderQuad *render_quad = list->quads + i;
+            struct Shader *quad_shader = data->shaders[render_quad->shader];
             /* BOOKMARK(Vidar): OpenGL call
             if(shader != quad_shader){
                 glUseProgram(quad_shader);
@@ -1938,18 +1911,20 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect,
                 render_quad.uniforms, data);
             glDrawArrays(GL_TRIANGLES, 0, 6);
           */
+            
             for(int i=0;i<3;i++){
-                render_quad.m[i*3+0] *= 2.f*scale;
-                render_quad.m[i*3+1] *= 2.f*scale*aspect;
+                render_quad->m[i*3+0] *= 2.f*scale;
+                render_quad->m[i*3+1] *= 2.f*scale*aspect;
             }
-            render_quad.m[6] -= 1.f;
-            render_quad.m[7] -= 1.f;
+            render_quad->m[6] -= 1.f;
+            render_quad->m[7] -= 1.f;
             if(aspect < 1.f){
-                render_quad.m[7] += 1 - scale*aspect;
+                render_quad->m[7] += 1 - scale*aspect;
             }else{
-                render_quad.m[6] += 1 - scale;
+                render_quad->m[6] += 1 - scale;
             }
-            graphics_render_mesh(data->quad_mesh, quad_shader, render_quad.uniforms, render_quad.num_uniforms, data->graphics);
+            
+            graphics_render_mesh(data->quad_mesh, quad_shader, render_quad->uniforms, render_quad->num_uniforms, data->graphics);
         }
         list = list->next;
     }
@@ -1972,10 +1947,6 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
         graphics_begin_render_pass(&frame_data->clear_color.r, data->graphics);
         if(frame_data->clear){
             graphics_clear(data->graphics);
-            /*glClearColor(frame_data->clear_color.r, frame_data->clear_color.g,
-                         frame_data->clear_color.b, 0.f);
-            glClear(GL_COLOR_BUFFER_BIT);
-             */
         }
         
         render_meshes(frame_data,aspect,data);

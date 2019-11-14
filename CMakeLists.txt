@@ -22,7 +22,8 @@ if(UNIX)
         find_package(GLUT REQUIRED)
         set(SATIN_OS_SRC
             ${SATIN_SRC_DIR}/os/osx/os.m
-            ${SATIN_SRC_DIR}/opengl/osx/opengl.c
+            ${SATIN_SRC_DIR}/window/osx_opengl/window.c
+            ${SATIN_SRC_DIR}/graphics/opengl/graphics.c
         )
         set(SATIN_OS_LIBS
             ${GLUT_glut_LIBRARY}

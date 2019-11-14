@@ -1,14 +1,14 @@
 #pragma once
 #include <stdint.h>
 #include "linalg/linalg.h"
-#include "renderer.h"
+#include "graphics/graphics.h"
 struct GameData;
 struct InputState;
 struct RenderContext;
 struct GameState;
 struct FrameData;
 
-struct GameData *init(int num_game_states, struct GameState *game_states, void *param, void *os_data, int debug_mode);
+struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode);
 int update(int ticks, struct InputState input_state, struct GameData *data);
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data);
 void end_game(struct GameData *data);
@@ -159,8 +159,6 @@ int is_key_down(int key);
 
 float sum_values(float *values, int num);
 
-void *get_os_data(struct GameData *data);
-void  set_os_data(void *os_data, struct GameData *data);
 
 //Input
 enum MouseState {
