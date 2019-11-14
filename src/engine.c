@@ -20,6 +20,7 @@
 #include "sort/sort.h"
 #include "renderer/renderer.h"
 #include "os/os.h"
+#include "memory/buffer.h"
 
 //#include <immintrin.h>
 
@@ -55,6 +56,12 @@ struct RenderTexture{
     unsigned int framebuffer;
     int width, height;
     struct Sprite sprite;
+};
+
+struct ScissorState {
+	int enabled;
+	float x1, y1;
+	float x2, y2;
 };
 
 struct GameData{
@@ -156,6 +163,8 @@ void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniform
         r->uniforms[0].type = GRAPHICS_VALUE_MAT3;
         r->uniforms[0].data = r->m;
     }
+    r->blend_mode = context->blend_mode;
+	r->scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
 }
 
 //TODO(Vidar):Should we be able to specity the anchor point when rendering
@@ -407,7 +416,9 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     render_mesh.mesh = mesh;
     render_mesh.shader = shader;
     num_uniforms += 2;
-
+	render_mesh.scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
+    *(struct Matrix4*)&render_mesh.m = mat;
+    *(struct Matrix4*)&render_mesh.cam = context->camera_3d;
     render_mesh.num_uniforms = num_uniforms;
     //TODO(Vidar):Can we avoid allocating memory??
     render_mesh.uniforms = calloc(num_uniforms*sizeof(struct GraphicsValueSpec),1);
@@ -442,6 +453,13 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     rm->uniforms[1].type = GRAPHICS_VALUE_MAT4;
     rm->uniforms[1].num = 1;
     rm->uniforms[1].data = rm->cam;
+}
+
+
+void set_scissor_state(int enabled, float x1, float y1, float x2, float y2, struct RenderContext* context)
+{
+	struct ScissorState state = { enabled, x1, y1, x2, y2 };
+	buffer_add(&state, sizeof(struct ScissorState), context->frame_data->scissor_states);
 }
 
 static int add_texture(unsigned char *sprite_data, int sprite_w, int sprite_h,
@@ -1321,6 +1339,7 @@ void get_window_extents(float *x_min, float *x_max, float *y_min, float *y_max,
 struct FrameData *frame_data_new()
 {
     struct FrameData *frame_data = calloc(1,sizeof(struct FrameData));
+	frame_data->scissor_states = buffer_create(512);
     return frame_data;
 }
 
@@ -1389,6 +1408,7 @@ void frame_data_reset(struct FrameData *frame_data)
             list = list->next;
         }
     }
+	buffer_reset(frame_data->scissor_states);
     frame_data->clear = 0;
 }
 
@@ -1544,7 +1564,6 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     
     /* BOOKMARK(Vidar): OpenGL call
     data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
-
 
 	glGenVertexArrays(1,&data->sprite_vertex_array);
 	glBindVertexArray(data->sprite_vertex_array);
@@ -1742,10 +1761,11 @@ void process_uniforms(int shader, int num_uniforms,
      */
 }
 
-void render_meshes(struct FrameData *frame_data, float aspect,
+void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
     struct GameData *data)
 {
     /* BOOKMARK(Vidar): OpenGL call
+	glDisable(GL_SCISSOR_TEST);
 	glEnable(GL_DEPTH_TEST);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	int current_depth_test_state = 1;
@@ -1753,6 +1773,8 @@ void render_meshes(struct FrameData *frame_data, float aspect,
      */
     graphics_set_depth_test(1,data->graphics);
     struct RenderMeshList *rml = &frame_data->render_mesh_list;
+	int scissor_state = -1;
+	struct ScissorState* scissor_states = buffer_ptr(frame_data->scissor_states);
     while(rml != 0){
         for(int i=0;i<rml->num;i++){
             struct RenderMesh *render_mesh = rml->meshes + i;
@@ -1775,6 +1797,33 @@ void render_meshes(struct FrameData *frame_data, float aspect,
                         break;
                 }
             }
+			if (scissor_state != render_mesh->scissor_state) {
+				struct ScissorState s = scissor_states[render_mesh->scissor_state];
+				if (s.enabled) {
+					glEnable(GL_SCISSOR_TEST);
+					float s_w = s.x2 - s.x1;
+					float s_h = s.y2 - s.y1;
+					if (aspect > 1.f) {
+						s.x1 += (aspect - 1.f) * 0.5f;
+						s.x1 /= aspect;
+						s_w  /= aspect;
+					}
+					if (aspect < 1.f) {
+						s.y1 = (s.y1*aspect +(1.f - aspect) * 0.5f);
+						s_h  *= aspect;
+					}
+					glScissor(
+						(int)((float)w * s.x1),
+						(int)((float)h * s.y1),
+						(int)((float)w * s_w),
+						(int)((float)h * s_h)
+					);
+				}
+				else {
+					glDisable(GL_SCISSOR_TEST);
+				}
+				scissor_state = render_mesh->scissor_state;
+			}
             int shader = mesh->shader->shader;
             glUseProgram(shader);
             glBindVertexArray(mesh->vertex_array);
@@ -1849,11 +1898,18 @@ void render_meshes(struct FrameData *frame_data, float aspect,
     }
 }
 
-void render_quads(struct FrameData *frame_data, float scale, float aspect,
+void render_quads(struct FrameData *frame_data, float scale, float aspect, int w, int h,
     struct GameData *data)
 {
     graphics_set_depth_test(0,data->graphics);
     struct RenderQuadList *list = &frame_data->render_quad_list;
+    /* BOOKMARK(Vidar): OpenGL call
+    int shader = -1;
+    enum BlendMode blend_mode = BLEND_MODE_NONE;
+	int scissor_state = -1;
+	struct ScissorState* scissor_states = buffer_ptr(frame_data->scissor_states);
+	glDisable(GL_SCISSOR_TEST);
+    */
     while(list != 0){
         for(int i=0;i<list->num;i++){
             struct RenderQuad *render_quad = list->quads + i;
@@ -1887,6 +1943,33 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect,
             //graphics_set_blend_mode(render_quad.blend_mode);
 
             /* BOOKMARK(Vidar): OpenGL call
+			if (scissor_state != render_quad.scissor_state) {
+				struct ScissorState s = scissor_states[render_quad.scissor_state];
+				if (s.enabled) {
+					glEnable(GL_SCISSOR_TEST);
+					float s_w = s.x2 - s.x1;
+					float s_h = s.y2 - s.y1;
+					if (aspect > 1.f) {
+						s.x1 += (aspect - 1.f) * 0.5f;
+						s.x1 /= aspect;
+						s_w  /= aspect;
+					}
+					if (aspect < 1.f) {
+						s.y1 = (s.y1*aspect +(1.f - aspect) * 0.5f);
+						s_h  *= aspect;
+					}
+					glScissor(
+						(int)((float)w * s.x1),
+						(int)((float)h * s.y1),
+						(int)((float)w * s_w),
+						(int)((float)h * s_h)
+					);
+				}
+				else {
+					glDisable(GL_SCISSOR_TEST);
+				}
+				scissor_state = render_quad.scissor_state;
+			}
             glBindVertexArray(data->quad_vertex_array);
             glBindBuffer(GL_ARRAY_BUFFER,data->quad_vertex_buffer);
             int loc=glGetUniformLocation(shader,"matrix");
@@ -1952,7 +2035,7 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
         render_meshes(frame_data,aspect,data);
         //glDisable(GL_DEPTH_TEST);
         
-        render_quads(frame_data,scale,aspect,data);
+        render_quads(frame_data,scale,aspect,w,h,data);
     }
     graphics_end_render_pass(data->graphics);
 }

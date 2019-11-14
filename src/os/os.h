@@ -24,6 +24,9 @@ int atomic_increment_int32(int *a);
 
 struct OSData *os_data_create(void);
 void os_data_set_data_folder_name(struct OSData *os_data, char *path);
+void save_screenshot(const char* filename)
+;
+
 char **get_args(int *argc);
 char *get_cwd(void);
 
@@ -31,7 +34,10 @@ enum OS_LIST_ENTRIES_TYPE {
 	OS_LIST_ENTRIES_TYPE_FOLDER = 1,
 	OS_LIST_ENTRIES_TYPE_FILE = 2,
 };
+//NOTE(Vidar): You have to free the strings returned in entries
 int os_list_entries_in_folder(const char *path, const char **entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type)
+;
+int os_list_resource_entries(const char* data_path, const char** entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type, struct GameData* data)
 ;
 int os_does_file_exist(const char *filename)
 ;

@@ -78,6 +78,9 @@ void render_sprite_screen_scaled_with_shader(int sprite,float x, float y,
     struct RenderContext *context)
 ;
 
+void set_scissor_state(int enabled, float x1, float y1, float x2, float y2, struct RenderContext* context)
+;
+
 void render_to_memory(int w, int h, unsigned char *pixels,
     struct FrameData *frame_data, struct GameData *data);
 void render_to_memory_float(int w, int h, float *pixels,
@@ -101,6 +104,8 @@ int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
 void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_data,
 	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
 	int *tri_data, int shader, struct GameData *data);
+void create_sprite_atlas(struct GameData* data)
+;
 
 int load_custom_mesh_from_memory(int num_verts, int num_tris,
 int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct GameData *data)

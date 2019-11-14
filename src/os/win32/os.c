@@ -2,6 +2,7 @@
 #include "engine.h"
 #include <Windows.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <Pathcch.h>
 #pragma comment(lib, "Pathcch.lib") 
@@ -199,6 +200,7 @@ WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 		return 0;
 
+		/*
 	case WM_LBUTTONDOWN:
 	if(params) {
 		POINT p = {
@@ -229,6 +231,7 @@ WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			params->input_state->mouse_state = MOUSE_NOTHING;
 			return 0;
 		}break;
+		*/
 
 	case WM_CLOSE:
 		if (params) {
@@ -536,6 +539,23 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				input_state.mouse_state = MOUSE_NOTHING;
 				break;
 			}
+			case WM_MBUTTONDOWN:
+			{
+				input_state.mouse_state_middle = MOUSE_CLICKED;
+				input_state.mouse_down_middle = 1;
+				POINT p;
+				GetCursorPos(&p);
+				ScreenToClient(hWnd, &p);
+				drag_start_x = p.x;
+				drag_start_y = p.y;
+				break;
+			}
+			case WM_MBUTTONUP:
+			{
+				input_state.mouse_down_middle = 0;
+				input_state.mouse_state_middle = MOUSE_NOTHING;
+				break;
+			}
 			case WM_MOUSEWHEEL:
 			{
 				input_state.scroll_delta_y = (float)GET_WHEEL_DELTA_WPARAM(msg.wParam)/120.f;
@@ -629,27 +649,25 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 				}
 			}
 
-			if (input_state.mouse_down) {
+			if (input_state.mouse_down || input_state.mouse_down_right || input_state.mouse_down_middle)
+			{
 				float dx = fabsf(input_state.drag_start_x - input_state.mouse_x);
 				float dy = fabsf(input_state.drag_start_y - input_state.mouse_y);
 				//printf("%f %f, %f %f\n",input_state.mouse_x,input_state.mouse_y,input_state.drag_start_x,input_state.drag_start_y);
 				float drag_dx = fabsf((float)GetSystemMetrics(SM_CXDRAG) / (float)(r.right - r.left));
 				float drag_dy = fabsf((float)GetSystemMetrics(SM_CYDRAG) / (float)(r.top - r.bottom));
 				if (dx>drag_dx || dy>drag_dy) {
-					input_state.mouse_state = MOUSE_DRAG;
+					if (input_state.mouse_down) {
+						input_state.mouse_state = MOUSE_DRAG;
+					}
+					if (input_state.mouse_down_right) {
+						input_state.mouse_state_right = MOUSE_DRAG;
+					}
+					if (input_state.mouse_down_middle) {
+						input_state.mouse_state_middle = MOUSE_DRAG;
+					}
 				}
 			}
-			if (input_state.mouse_down_right) {
-				float dx = fabsf(input_state.drag_start_x - input_state.mouse_x);
-				float dy = fabsf(input_state.drag_start_y - input_state.mouse_y);
-				//printf("%f %f, %f %f\n",input_state.mouse_x,input_state.mouse_y,input_state.drag_start_x,input_state.drag_start_y);
-				float drag_dx = fabsf((float)GetSystemMetrics(SM_CXDRAG) / (float)(r.right - r.left));
-				float drag_dy = fabsf((float)GetSystemMetrics(SM_CYDRAG) / (float)(r.top - r.bottom));
-				if (dx>drag_dx || dy>drag_dy) {
-					input_state.mouse_state_right = MOUSE_DRAG;
-				}
-			}
-
 
 			LARGE_INTEGER current_tick, delta_ticks;
 			QueryPerformanceCounter(&current_tick);
@@ -668,6 +686,10 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			input_state.prev_mouse_state_right = input_state.mouse_state_right;
 			if (input_state.mouse_state_right == MOUSE_CLICKED) {
 				input_state.mouse_state_right = MOUSE_NOTHING;
+			}
+			input_state.prev_mouse_state_middle = input_state.mouse_state_middle;
+			if (input_state.mouse_state_middle == MOUSE_CLICKED) {
+				input_state.mouse_state_middle = MOUSE_NOTHING;
 			}
 			input_state.num_keys_typed = 0;
 			input_state.scroll_delta_y = 0.f;
@@ -724,10 +746,35 @@ int os_list_entries_in_folder(const char *path, const char **entries, int max_nu
 	return num_entries;
 }
 
+int os_list_resource_entries(const char *data_path, const char** entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type, struct GameData *data)
+{
+	struct Win32Data *os_data = (struct Win32Data *)get_os_data(data);
+	size_t os_data_path_len = wcstombs(0,os_data->data_base_path,0);
+	size_t len = os_data_path_len + strlen(data_path) + 1;
+	char* buffer = calloc(len, 1);
+	wcstombs(buffer, os_data->data_base_path, os_data_path_len);
+	strcpy(buffer + os_data_path_len, data_path);
+	int ret = os_list_entries_in_folder(buffer, entries, max_num_entries, type);
+	free(buffer);
+	return ret;
+}
+
 int os_does_file_exist(const char *filename)
 {
 	DWORD dwAttrib = GetFileAttributesA(filename);
 
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
 		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+void save_screenshot(const char* filename)
+{
+	const char* arg = "savescreenshotfull ";
+	size_t arg_len = strlen(arg) + 1;
+	size_t filename_len = strlen(filename) + 1;
+	char* buffer = calloc(arg_len + filename_len + 32, 1);
+	sprintf(buffer, "%s %s", arg, filename);
+	ShellExecuteA(0, "open", "M:/_Common/Software/nircmd-x64/nircmdc.exe",
+		buffer, 0, SW_HIDE);
+	free(buffer);
 }
