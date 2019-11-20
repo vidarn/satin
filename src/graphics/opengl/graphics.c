@@ -1,7 +1,10 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include "graphics/graphics.h"
+#include "os/os.h"
+#include "window/window.h"
 
 #define SATIN_SHADER_SUFFIX ""
 #ifdef _WIN32
@@ -21,6 +24,9 @@ struct GraphicsData
 
 struct Shader
 {
+    char *vert_filename;
+    char *frag_filename;
+    int valid;
     int handle;
 };
 
@@ -35,7 +41,7 @@ struct Mesh
 
 struct Texture
 {
-    int dummy;
+    unsigned int handle;
 };
 
 int graphics_value_sizes[] = {
@@ -90,45 +96,177 @@ void graphics_clear(struct GraphicsData *graphics)
     glClear(GL_COLOR_BUFFER_BIT);
 }
 
-void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader, struct GraphicsValueSpec *uniform_specs, int num_uniform_specs, struct GraphicsData *graphics)
+void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader,
+        struct GraphicsValueSpec *uniform_specs, int num_uniform_specs,
+        struct GraphicsData *graphics)
 {
+    int shader_handle = shader->handle;
+    glUseProgram(shader_handle);
+    glBindVertexArray(mesh->vertex_array);
+    //glBindBuffer(GL_ARRAY_BUFFER,mesh->vertex_buffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
+
+    int num_textures = 0;
+    for(int j=0;j<num_uniform_specs;j++){
+        struct GraphicsValueSpec u = uniform_specs[j];
+        int loc=glGetUniformLocation(shader_handle,u.name);
+        if(loc == -1){
+            printf("Warning: Could not find \"%s\" uniform in shader (%s,%s)\n",
+                u.name, shader->vert_filename, shader->frag_filename);
+        }else{
+            switch(u.type){
+                case GRAPHICS_VALUE_INT:
+                    glUniform1iv(loc, u.num, u.data);
+                    break;
+                case GRAPHICS_VALUE_FLOAT:
+                    glUniform1fv(loc, u.num, u.data);
+                    break;
+                case GRAPHICS_VALUE_MAT4:
+                    glUniformMatrix4fv(loc,u.num,GL_FALSE,u.data);
+                    break;
+                case GRAPHICS_VALUE_MAT3:
+                    glUniformMatrix3fv(loc,u.num,GL_FALSE,u.data);
+                    break;
+                case GRAPHICS_VALUE_VEC4:
+                    glUniform4fv(loc,u.num,u.data);
+                    break;
+                case GRAPHICS_VALUE_VEC3:
+                    glUniform3fv(loc,u.num,u.data);
+                    break;
+                case GRAPHICS_VALUE_VEC2:
+                    glUniform2fv(loc,u.num,u.data);
+                    break;
+                case GRAPHICS_VALUE_TEX2:
+                {
+                    struct Texture *tex = u.data;
+                    glUniform1i(loc, num_textures);
+                    glActiveTexture(GL_TEXTURE0 + num_textures);
+                    glBindTexture(GL_TEXTURE_2D, tex->handle);
+                    num_textures++;
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    }
+
+    glDrawElements(GL_TRIANGLES, mesh->num_indices,GL_UNSIGNED_INT,(void*)0);
 }
 
-struct Shader *graphics_compile_shader(const char *vert_source, const char *frag_source,
-    enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics)
+static GLint check_compilation(GLuint handle,GLenum flag,
+	char *error_buffer,size_t error_buffer_len,const char *name)
+{
+	GLint ret = GL_FALSE;
+	if(flag==GL_COMPILE_STATUS){
+		glGetShaderiv(handle,flag,&ret);
+	}
+	if(flag==GL_LINK_STATUS){
+		glGetProgramiv(handle,flag,&ret);
+	}
+	if(ret!=GL_TRUE){
+		sprintf(error_buffer,"%s:\n",name);
+		size_t buff_len=strlen(error_buffer);
+		GLsizei len = 0;
+		if(flag==GL_COMPILE_STATUS){
+			glGetShaderInfoLog(handle,(GLsizei)(error_buffer_len-buff_len),&len,
+               error_buffer+buff_len);
+		}
+		if(flag==GL_LINK_STATUS){
+			glGetProgramInfoLog(handle,(GLsizei)(error_buffer_len-buff_len),
+                &len,error_buffer+buff_len);
+		}
+		error_buffer[len+buff_len]=0;
+	}
+	return ret;
+}
+
+static void print_shader_listing(const char *shader_source,
+        const char *shader_filename, const char *shader_type)
+{
+    printf("  ~ %s shader \"%s\" ~\n", shader_type, shader_filename);
+    int line_no = 0;
+    printf("%02d| ", line_no++);
+    const char *c = shader_source;
+    while(*c != 0){
+        putchar(*c);
+        if(*c=='\n'){
+            printf("%02d| ", line_no++);
+        }
+        c++;
+    }
+    printf("\n");
+}
+
+struct Shader *graphics_compile_shader(const char *vert_filename, const char *frag_filename,
+    enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics,
+    struct WindowData *window_data)
 {
     const char *version_string = "#version 330\n";
-    struct Shader *shader = calloc(1,sizeof(struct Shader));
     
-	int shader_handle=glCreateProgram();
-	int vert_handle=glCreateShader(GL_VERTEX_SHADER);
-	int frag_handle=glCreateShader(GL_FRAGMENT_SHADER);
-    const char *vert_char[2] = {version_string,vert_source};
-    const char *frag_char[2] = {version_string,frag_source};
-	glShaderSource(vert_handle,2,vert_char,0);
-	glShaderSource(frag_handle,2,frag_char,0);
-	glCompileShader(vert_handle);
-	if(check_compilation(vert_handle,GL_COMPILE_STATUS,
-		error_buffer,error_buffer_len,"vertex shader")!=GL_TRUE)
-	{
-		return -1;
-	}
-	glCompileShader(frag_handle);
-	if(check_compilation(frag_handle,GL_COMPILE_STATUS,
-		error_buffer,error_buffer_len,"fragment shader")!=GL_TRUE)
-	{
-		return -1;
-	}
-	glAttachShader(shader_handle,vert_handle);
-	glAttachShader(shader_handle,frag_handle);
-	glLinkProgram(shader_handle);
-	if(check_compilation(shader_handle,GL_LINK_STATUS,
-		error_buffer,error_buffer_len,"shader program")!=GL_TRUE)
-	{
-		return -1;
-	}
+    struct Shader *shader = calloc(1,sizeof(struct Shader));
+    shader->vert_filename = strdup(vert_filename);
+    shader->frag_filename = strdup(frag_filename);
 
-    shader->handle = shader_handle;
+    printf("Compile shader %s %s\n", vert_filename, frag_filename);
+    FILE *vert_fp = open_file(vert_filename, "vert", "rt", window_get_os_data(window_data));
+    if(vert_fp){
+        FILE *frag_fp = open_file(frag_filename, "frag", "rt", window_get_os_data(window_data));
+        if(frag_fp){
+            fseek(vert_fp, 0, SEEK_END);
+            fseek(frag_fp, 0, SEEK_END);
+            size_t vert_len = ftell(vert_fp);
+            size_t frag_len = ftell(frag_fp);
+            rewind(vert_fp);
+            rewind(frag_fp);
+            char *vert_source = calloc(vert_len+1 + frag_len+1, 1);
+            char *frag_source = vert_source + vert_len + 1;
+            fread(vert_source, vert_len, 1, vert_fp);
+            fread(frag_source, frag_len, 1, frag_fp);
+
+            int shader_handle=glCreateProgram();
+            int vert_handle=glCreateShader(GL_VERTEX_SHADER);
+            int frag_handle=glCreateShader(GL_FRAGMENT_SHADER);
+            const char *vert_char[2] = {version_string,vert_source};
+            const char *frag_char[2] = {version_string,frag_source};
+            glShaderSource(vert_handle,2,vert_char,0);
+            glShaderSource(frag_handle,2,frag_char,0);
+            glCompileShader(vert_handle);
+            if(check_compilation(vert_handle,GL_COMPILE_STATUS,
+                error_buffer,error_buffer_len,"vertex shader")!=GL_TRUE)
+            {
+                print_shader_listing(vert_source, vert_filename, "Vertex");
+                goto cleanup;
+            }
+            glCompileShader(frag_handle);
+            if(check_compilation(frag_handle,GL_COMPILE_STATUS,
+                error_buffer,error_buffer_len,"fragment shader")!=GL_TRUE)
+            {
+                print_shader_listing(frag_source, frag_filename, "Fragment");
+                goto cleanup;
+            }
+            glAttachShader(shader_handle,vert_handle);
+            glAttachShader(shader_handle,frag_handle);
+            glLinkProgram(shader_handle);
+            if(check_compilation(shader_handle,GL_LINK_STATUS,
+                error_buffer,error_buffer_len,"shader program")!=GL_TRUE)
+            {
+                goto cleanup;
+            }
+
+            shader->valid  = 1;
+            shader->handle = shader_handle;
+
+cleanup:
+            //NOTE(Vidar):We only need one free since the buffers are allocated together
+            free(vert_source);
+            fclose(frag_fp);
+        }
+        fclose(vert_fp);
+    }else{
+        printf("Could not open file\n");
+    }
+    
 
     return shader;
 }
@@ -160,6 +298,7 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,num_indices*4,index_data,
                  GL_STATIC_DRAW);
+    printf("Mesh created!\n");
 
     return mesh;
 }
@@ -167,6 +306,16 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
 struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint32_t h, uint32_t format, struct GraphicsData *graphics)
 {
     struct Texture *texture = calloc(1,sizeof(struct Texture));
+	glGenTextures(1, &texture->handle);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture->handle);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexImage2D(GL_TEXTURE_2D, 0,format, w, h,
+        0, format, GL_UNSIGNED_BYTE, texture_data);
+    printf("Loaded texture!\n");
     return texture;
 }
 

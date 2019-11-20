@@ -7,6 +7,7 @@ struct InputState;
 struct RenderContext;
 struct GameState;
 struct FrameData;
+struct WindowData;
 
 struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode);
 int update(int ticks, struct InputState input_state, struct GameData *data);

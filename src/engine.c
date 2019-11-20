@@ -19,6 +19,7 @@
 #include "tinyobj_loader_c.h"
 #include "sort/sort.h"
 #include "renderer/renderer.h"
+#include "window/window.h"
 #include "os/os.h"
 #include "memory/buffer.h"
 
@@ -163,8 +164,10 @@ void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniform
         r->uniforms[0].type = GRAPHICS_VALUE_MAT3;
         r->uniforms[0].data = r->m;
     }
+    /*
     r->blend_mode = context->blend_mode;
 	r->scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
+    */
 }
 
 //TODO(Vidar):Should we be able to specity the anchor point when rendering
@@ -416,7 +419,7 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     render_mesh.mesh = mesh;
     render_mesh.shader = shader;
     num_uniforms += 2;
-	render_mesh.scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
+	//render_mesh.scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
     *(struct Matrix4*)&render_mesh.m = mat;
     *(struct Matrix4*)&render_mesh.cam = context->camera_3d;
     render_mesh.num_uniforms = num_uniforms;
@@ -458,8 +461,8 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
 
 void set_scissor_state(int enabled, float x1, float y1, float x2, float y2, struct RenderContext* context)
 {
-	struct ScissorState state = { enabled, x1, y1, x2, y2 };
-	buffer_add(&state, sizeof(struct ScissorState), context->frame_data->scissor_states);
+	//struct ScissorState state = { enabled, x1, y1, x2, y2 };
+	//buffer_add(&state, sizeof(struct ScissorState), context->frame_data->scissor_states);
 }
 
 static int add_texture(unsigned char *sprite_data, int sprite_w, int sprite_h,
@@ -532,7 +535,7 @@ static int compare_tinyobj_vert_index(void *a, void*b, void *data)
 int load_mesh(const char *name, struct GameData *data)
 {
     //TODO(Vidar):Don't use obj!!
-    FILE *fp=open_file(name,".obj","rb",data);
+    FILE *fp=open_file(name,".obj","rb", window_get_os_data(data->window_data));
     if(fp){
         fseek(fp,0,SEEK_END);
         size_t len=ftell(fp);
@@ -981,7 +984,7 @@ int load_shader(const char* vert_filename,
     const char * frag_filename, enum GraphicsBlendMode blend_mode, struct GameData *data)
 {
     char error_buffer[ERROR_BUFFER_LEN] = {0};
-    struct Shader *shader = graphics_compile_shader(vert_filename, frag_filename, blend_mode, error_buffer, ERROR_BUFFER_LEN, data->graphics);
+    struct Shader *shader = graphics_compile_shader(vert_filename, frag_filename, blend_mode, error_buffer, ERROR_BUFFER_LEN, data->graphics, data->window_data);
     if(error_buffer[0] != 0){
         printf("Shader compilation error:\n%s\n",error_buffer);
     }
@@ -1046,7 +1049,7 @@ int load_image_from_memory(int sprite_w, int sprite_h,
 int load_image(const char *name, struct GameData *data)
 {
     int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, ".png", "rb",data);
+    FILE *fp=open_file(name, ".png", "rb",window_get_os_data(data->window_data));
     unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
         &sprite_h, &sprite_channels, 4);
     fclose(fp);
@@ -1141,7 +1144,7 @@ int load_sprite(const char *name, struct GameData *data)
     //Could use TURBO-jpeg?
     //Or some compression that is supported by the hardware on IOS??
 
-    FILE *fp=open_file(name, ".png", "rb",data);
+    FILE *fp=open_file(name, ".png", "rb",window_get_os_data(data->window_data));
 	return internal_load_sprite_from_fp(fp, name, data);
 }
 
@@ -1159,7 +1162,7 @@ float get_font_height(int font, struct GameData *data)
 
 int load_font(const char *name, double font_size, struct GameData *data)
 {
-    FILE *fp = open_file(name,".ttf","rb",data);
+    FILE *fp = open_file(name,".ttf","rb",window_get_os_data(data->window_data));
     if(!fp){
         //TODO(Vidar):Report error somehow...
         return -1;
@@ -1339,7 +1342,7 @@ void get_window_extents(float *x_min, float *x_max, float *y_min, float *y_max,
 struct FrameData *frame_data_new()
 {
     struct FrameData *frame_data = calloc(1,sizeof(struct FrameData));
-	frame_data->scissor_states = buffer_create(512);
+	//frame_data->scissor_states = buffer_create(512);
     return frame_data;
 }
 
@@ -1408,7 +1411,7 @@ void frame_data_reset(struct FrameData *frame_data)
             list = list->next;
         }
     }
-	buffer_reset(frame_data->scissor_states);
+	//buffer_reset(frame_data->scissor_states);
     frame_data->clear = 0;
 }
 
@@ -1541,11 +1544,11 @@ float sum_values(float *values, int num)
 }
 
 
-struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode);
+struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode)
 {
     struct GameData *data = calloc(1,sizeof(struct GameData));
     data->window_data = window_data;
-    data->graphics = window_get_graphics(window_data);
+    data->graphics = window_get_graphics_data(window_data);
 	data->debug_mode = debug_mode;
 
     data->num_game_state_types = num_game_states;
@@ -1773,8 +1776,10 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
      */
     graphics_set_depth_test(1,data->graphics);
     struct RenderMeshList *rml = &frame_data->render_mesh_list;
+    /*
 	int scissor_state = -1;
 	struct ScissorState* scissor_states = buffer_ptr(frame_data->scissor_states);
+    */
     while(rml != 0){
         for(int i=0;i<rml->num;i++){
             struct RenderMesh *render_mesh = rml->meshes + i;
@@ -2032,7 +2037,7 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
             graphics_clear(data->graphics);
         }
         
-        render_meshes(frame_data,aspect,data);
+        render_meshes(frame_data,aspect,w,h,data);
         //glDisable(GL_DEPTH_TEST);
         
         render_quads(frame_data,scale,aspect,w,h,data);

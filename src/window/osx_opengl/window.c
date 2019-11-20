@@ -1,11 +1,13 @@
 #include "glut.h"
 #include "engine.h"
+#include "os/os.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 struct WindowData{
     struct OSData *os_data;
     struct GraphicsData *graphics_data;
-}
+};
 
 static struct InputState g_input_state;
 static struct GameData *g_game_data;
@@ -65,7 +67,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
     struct GraphicsData *graphics = graphics_create(0);
     window_data->graphics_data = graphics;
 
-	struct GameData *game_data = init(num_game_states, game_states, param, os_data, graphics, debug_mode);
+	struct GameData *game_data = init(num_game_states, game_states, param, window_data, debug_mode);
     g_game_data = game_data;
     struct InputState input_state= {0};
     g_input_state = input_state;
@@ -77,9 +79,15 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 
 struct OSData *window_get_os_data(struct WindowData *window)
 {
-	return data->os_data;
+	return window->os_data;
 }
 
+struct GraphicsData *window_get_graphics_data(struct WindowData *window)
+{
+    return window->graphics_data;
+}
+
+/*
 struct Shader *window_compile_shader(const char *vert_filename,
         const char *frag_filename, enum GraphicsBlendMode blend_mode,
         char *error_buffer, int error_buffer_len,
@@ -110,3 +118,4 @@ struct Shader *window_compile_shader(const char *vert_filename,
     }
     return shader;
 }
+*/

@@ -66,7 +66,10 @@ void graphics_clear(struct GraphicsData *graphics)
 void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader, struct GraphicsValueSpec *uniform_specs, int num_uniform_specs, struct GraphicsData *graphics)
 ;
 
-struct Shader *graphics_compile_shader(const char *vert_source, const char *frag_source, enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics)
+struct WindowData;
+struct Shader *graphics_compile_shader(const char *vert_source, const char *frag_source,
+    enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics,
+    struct WindowData *window_data)
 ;
 
 struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_t num_value_specs, uint32_t num_verts, int *index_data, uint32_t num_indices, struct GraphicsData *graphics)
