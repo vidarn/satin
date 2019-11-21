@@ -258,7 +258,8 @@ struct RenderContext
     float w,h,offset_x, offset_y;
     struct FrameData *frame_data;
     struct GameData *data;
-    struct Matrix4 camera_3d;
+    struct Matrix4 view_3d;
+    struct Matrix4 proj_3d;
     struct Matrix3 camera_2d;
 	int disable_depth_test;
     enum BlendMode blend_mode;

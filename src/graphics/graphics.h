@@ -24,7 +24,8 @@ struct RenderMesh{
 	void (*callback)(void *param);
 	void *callback_param;
     float m[16];
-    float cam[16];
+    float view[16];
+    float proj[16];
     int mesh;
     int num_uniforms;
 	int depth_test;

@@ -429,7 +429,8 @@ void render_mesh_with_callback(int mesh, struct Matrix4 mat, struct ShaderUnifor
     render_mesh.mesh = mesh;
 	render_mesh.scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
     *(struct Matrix4*)&render_mesh.m = mat;
-    *(struct Matrix4*)&render_mesh.cam = context->camera_3d;
+    *(struct Matrix4*)&render_mesh.view = context->view_3d;
+    *(struct Matrix4*)&render_mesh.proj = context->proj_3d;
     render_mesh.num_uniforms = num_uniforms;
     //TODO(Vidar):Can we avoid allocating memory??
     render_mesh.uniforms = calloc(num_uniforms*sizeof(struct ShaderUniform),1);
@@ -1870,7 +1871,8 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
             int loc_model=glGetUniformLocation(shader,"model_matrix");
             int loc_view=glGetUniformLocation(shader,"view_matrix");
-            if(loc_model == -1 || loc_view == -1){
+            int loc_proj=glGetUniformLocation(shader,"proj_matrix");
+            if(loc_model == -1 || loc_view == -1 || loc_proj == -1){
                 if(loc_model == -1){
                     printf("Error: Could not find \"%s\" uniform in shader\n",
                            "model_matrix");
@@ -1878,6 +1880,10 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
                 if(loc_view == -1){
                     printf("Error: Could not find \"%s\" uniform in shader\n",
                        "view_matrix");
+                }
+                if(loc_proj == -1){
+                    printf("Error: Could not find \"%s\" uniform in shader\n",
+                       "proj_matrix");
                 }
             }else{
                 struct Matrix4 asp_m={0};
@@ -1890,10 +1896,11 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
                 }
                 asp_m.m[10]=1.f;
                 asp_m.m[15]=1.f;
-                struct Matrix4 view_m =
-                    multiply_matrix4(*(struct Matrix4*)&render_mesh->cam,asp_m);
+				struct Matrix4 view_m = *(struct Matrix4*) & render_mesh->view;
+				struct Matrix4 proj_m = multiply_matrix4(*(struct Matrix4*)&render_mesh->proj,asp_m);
                 struct Matrix4 model_m = *(struct Matrix4*)&render_mesh->m;
                 glUniformMatrix4fv(loc_view,1,GL_FALSE,(float*)&view_m.m[0]);
+                glUniformMatrix4fv(loc_proj,1,GL_FALSE,(float*)&proj_m.m[0]);
                 glUniformMatrix4fv(loc_model,1,GL_FALSE,(float*)&model_m.m[0]);
             }
             process_uniforms(shader, render_mesh->num_uniforms,
