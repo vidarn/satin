@@ -1055,6 +1055,9 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     s.width        = (float)sprite_w;
     s.inv_aspect   = (float)sprite_h/(float)sprite_w;
 
+	return texture;
+
+	/*
     //TODO(Vidar): double the amount of sprites instead?
     data->sprites = realloc(data->sprites,(data->num_sprites+1)
         *sizeof(struct Sprite));
@@ -1070,6 +1073,7 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     data->num_sprites++;
 
     return data->num_sprites-1;
+	*/
 }
 
 int load_image(const char *name, struct GameData *data)
@@ -1763,42 +1767,43 @@ void process_uniforms(int shader, int num_uniforms,
                 case SHADER_UNIFORM_TEX2:
                 {
                     int texture_id = *(int*)u.data;
-                    glUniform1i(loc, num_textures);
-                    glActiveTexture(GL_TEXTURE0 + num_textures);
-                    glBindTexture(GL_TEXTURE_2D, data->texture_ids[texture_id]);
-                    num_textures++;
+					if (texture_id >= 0) {
+						glUniform1i(loc, num_textures);
+						glActiveTexture(GL_TEXTURE0 + num_textures);
+						glBindTexture(GL_TEXTURE_2D, data->texture_ids[texture_id]);
+						num_textures++;
+					}
                     break;
                 }
                 case SHADER_UNIFORM_SPRITE_POINTER:
                 case SHADER_UNIFORM_SPRITE:
                 {
-                    struct Sprite *sprite;
+                    struct Sprite *sprite = 0;
                     if(u.type == SHADER_UNIFORM_SPRITE_POINTER){
                         sprite = *(struct Sprite**)u.data;
                     }else{
                         int sprite_id = *(int*)u.data;
-                        sprite = data->sprites + sprite_id;
+						if (sprite_id >= 0) {
+							sprite = data->sprites + sprite_id;
+						}
                     }
-		    /*
-		    printf("rendering sprite %f %f %f %f\n",
-			    sprite->uv_offset[0], sprite->uv_offset[1],
-			    sprite->uv_size[0], sprite->uv_size[1]);
-			    */
-                    glUniform1i(loc, num_textures);
-                    glActiveTexture(GL_TEXTURE0 + num_textures);
-                    glBindTexture(GL_TEXTURE_2D,
-                        data->texture_ids[sprite->texture]);
-                    num_textures++;
-                    size_t len = strlen(u.name) + 4;
-                    char *buffer = alloca(len);
-                    sprintf(buffer, "%s_uv", u.name);
-                    int uv_loc=glGetUniformLocation(shader,buffer);
-                    if(uv_loc == -1){
-                        printf("Error: Could not find \"%s\" uniform in shader\n",
-                            buffer);
-                    }else{
-                        glUniform4fv(uv_loc,1,sprite->uv_offset);
-                    }
+					if(sprite){
+						glUniform1i(loc, num_textures);
+						glActiveTexture(GL_TEXTURE0 + num_textures);
+						glBindTexture(GL_TEXTURE_2D,
+							data->texture_ids[sprite->texture]);
+						num_textures++;
+						size_t len = strlen(u.name) + 4;
+						char *buffer = alloca(len);
+						sprintf(buffer, "%s_uv", u.name);
+						int uv_loc=glGetUniformLocation(shader,buffer);
+						if(uv_loc == -1){
+							printf("Error: Could not find \"%s\" uniform in shader\n",
+								buffer);
+						}else{
+							glUniform4fv(uv_loc,1,sprite->uv_offset);
+						}
+					}
                     break;
                 }
             }

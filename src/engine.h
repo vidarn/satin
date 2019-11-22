@@ -119,6 +119,12 @@ float get_font_height(int font, struct GameData *data);
 int load_font(const char *name, double font_size,
     struct GameData *data);
 
+int load_image_from_memory(int sprite_w, int sprite_h,
+	unsigned char* sprite_data, struct GameData* data)
+;
+int load_image(const char *name, struct GameData *data)
+;
+
 int load_sprite_from_memory(int sprite_w, int sprite_h,
     unsigned char *sprite_data, struct GameData *data);
 int load_sprite(const char *name, struct GameData *data);
