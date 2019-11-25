@@ -90,12 +90,13 @@ struct ScissorState {
 
 struct GameData{
     //TODO(Vidar):Remove these...
-    GLuint line_vertex_array;
-    GLuint line_vertex_buffer;
 	GLuint sprite_vertex_array;
 	GLuint sprite_vertex_buffer;
+    GLuint line_vertex_array;
+    GLuint line_vertex_buffer;
     int sprite_shader;
     int line_shader;
+    int fill_shader;
 	GLuint quad_vertex_array;
 	GLuint quad_vertex_buffer;
     GLuint *texture_ids;
@@ -142,6 +143,7 @@ int test_mesh;
 
 float sprite_render_data[render_sprite_list_size*6*2*2*2];
 float line_render_data[  render_sprite_list_size*6*2*2*2];
+float fill_render_data[  render_sprite_list_size*6*2*2*2];
 static const int font_bitmap_size = 512;
 const float quad_render_data[] = {
     0.f, 0.f,
@@ -387,15 +389,15 @@ void render_line_screen(float x1, float y1, float x2, float y2, float thickness,
 	float m22 = context->camera_2d.m[4];
 	float scale_x = sqrtf(m11*m11 + m12*m12);
 	float scale_y = sqrtf(m21*m21 + m22*m22);
-    float dx1 = (x2-x1);
-    float dy1 = (y2-y1);
+	float dx1 = (x2 - x1);
+	float dy1 = (y2 - y1);
     float mag = sqrtf(dx1*dx1 + dy1*dy1);
     float dx2 = -dy1/mag*thickness/scale_x;
     float dy2 =  dx1/mag*thickness/scale_y;
     struct Matrix3 m= {
         dx1, dy1, 0.f,
         dx2, dy2, 0.f,
-        x1+context->offset_x, y1+context->offset_y, 1.0f,
+        x1+context->offset_x-dx2/2.f, y1+context->offset_y-dy2/2.f, 1.0f,
     };
     struct ShaderUniform uniforms[] = {
         {"color", SHADER_UNIFORM_VEC4, 1, &color},
@@ -411,6 +413,22 @@ void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
     render_line_screen(x2, y1, x2, y2, thickness, color, context);
     render_line_screen(x1, y1, x2, y1, thickness, color, context);
     render_line_screen(x1, y2, x2, y2, thickness, color, context);
+}
+
+void render_rect_fill_screen(float x1, float y1, float x2, float y2, 
+    struct Color color, struct RenderContext *context)
+{
+	float thickness = 0.001f;
+    struct Matrix3 m= {
+        x2-x1, 0, 0.f,
+        0, y2-y1, 0.f,
+        x1+context->offset_x, y1+context->offset_y, 1.0f,
+    };
+    struct ShaderUniform uniforms[] = {
+        {"color", SHADER_UNIFORM_VEC4, 1, &color},
+    };
+    int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
+    render_quad(context->data->fill_shader, m, uniforms, num_uniforms, context);
 }
 
 void render_mesh(int mesh, struct Matrix4 mat, struct ShaderUniform *uniforms,
@@ -1583,6 +1601,8 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
 
     data->line_shader = load_shader("line" SATIN_SHADER_SUFFIX, "line" SATIN_SHADER_SUFFIX , data, "pos", (char*)0);
+    
+	data->fill_shader = load_shader("fill" SATIN_SHADER_SUFFIX, "fill" SATIN_SHADER_SUFFIX , data, "pos", (char*)0);
 
     data->num_game_state_types = num_game_states;
     data->game_state_types = calloc(num_game_states,sizeof(struct GameState));
@@ -1645,7 +1665,7 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
             6*sizeof(GL_FLOAT),(void*)(2*sizeof(GL_FLOAT)));
          */
     }
-
+	
     glActiveTexture(GL_TEXTURE0);
 
 	glGenVertexArrays(1,&data->quad_vertex_array);
