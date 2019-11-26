@@ -12,6 +12,8 @@ if(WIN32)
 	set(SATIN_OS_SRC
 		${SATIN_SRC_DIR}/os/win32/os.c
 		${SATIN_SRC_DIR}/opengl/win32/opengl.c
+		${SATIN_SRC_DIR}/window/win32_opengl/window.c
+		${SATIN_SRC_DIR}/graphics/opengl/graphics.c
 	)
 	set(SATIN_OS_LIBS
 		Xinput.lib 

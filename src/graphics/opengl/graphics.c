@@ -20,6 +20,8 @@ static const char *glsl_version_string = "#version 330\n";
 struct GraphicsData
 {
     float clear_color[4];
+	enum GraphicsBlendMode blend_mode;
+	int shader_handle;
 };
 
 struct Shader
@@ -28,6 +30,7 @@ struct Shader
     char *frag_filename;
     int valid;
     int handle;
+	enum GraphicsBlendMode blend_mode;
 };
 
 struct Mesh
@@ -79,6 +82,8 @@ struct GraphicsData *graphics_create(void * param)
 void graphics_begin_render_pass(float *clear_rgba, struct GraphicsData *graphics)
 {
     memcpy(graphics->clear_color, clear_rgba, 4*4);
+	graphics->blend_mode = GRAPHICS_BLEND_MODE_NONE;
+	graphics->shader_handle = -1;
 }
 
 void graphics_end_render_pass(struct GraphicsData *graphics)
@@ -100,10 +105,31 @@ void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader,
         struct GraphicsValueSpec *uniform_specs, int num_uniform_specs,
         struct GraphicsData *graphics)
 {
+
+	if (shader->blend_mode != graphics->blend_mode) {
+		if(graphics->blend_mode == GRAPHICS_BLEND_MODE_NONE){
+			glEnable(GL_BLEND);
+		}
+		switch(shader->blend_mode){
+			case GRAPHICS_BLEND_MODE_PREMUL:
+				glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+				break;
+			case GRAPHICS_BLEND_MODE_MULTIPLY:
+				glBlendFunc(GL_DST_COLOR,GL_ZERO);
+				break;
+			case GRAPHICS_BLEND_MODE_NONE:
+				glDisable(GL_BLEND);
+				break;
+		}
+		graphics->blend_mode = shader->blend_mode;
+	}
+
     int shader_handle = shader->handle;
-    glUseProgram(shader_handle);
+	if (shader_handle != graphics->shader_handle) {
+		glUseProgram(shader_handle);
+		graphics->shader_handle = shader_handle;
+	}
     glBindVertexArray(mesh->vertex_array);
-    //glBindBuffer(GL_ARRAY_BUFFER,mesh->vertex_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
 
     int num_textures = 0;
@@ -313,8 +339,17 @@ struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint3
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0,format, w, h,
-        0, format, GL_UNSIGNED_BYTE, texture_data);
+	GLenum gl_format;
+	switch (format) {
+	case GRAPHICS_PIXEL_FORMAT_RGBA:
+		gl_format = GL_RGBA;
+		break;
+	default:
+		gl_format = GL_RGBA;
+		break;
+	}
+    glTexImage2D(GL_TEXTURE_2D, 0,gl_format, w, h,
+        0, gl_format, GL_UNSIGNED_BYTE, texture_data);
     printf("Loaded texture!\n");
     return texture;
 }

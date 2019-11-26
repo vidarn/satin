@@ -535,7 +535,7 @@ static int compare_tinyobj_vert_index(void *a, void*b, void *data)
 int load_mesh(const char *name, struct GameData *data)
 {
     //TODO(Vidar):Don't use obj!!
-    FILE *fp=open_file(name,".obj","rb", window_get_os_data(data->window_data));
+    FILE *fp=open_file(name,"obj","rb", window_get_os_data(data->window_data));
     if(fp){
         fseek(fp,0,SEEK_END);
         size_t len=ftell(fp);
@@ -1049,7 +1049,7 @@ int load_image_from_memory(int sprite_w, int sprite_h,
 int load_image(const char *name, struct GameData *data)
 {
     int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, ".png", "rb",window_get_os_data(data->window_data));
+    FILE *fp=open_file(name, "png", "rb",window_get_os_data(data->window_data));
     unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
         &sprite_h, &sprite_channels, 4);
     fclose(fp);
@@ -1144,7 +1144,7 @@ int load_sprite(const char *name, struct GameData *data)
     //Could use TURBO-jpeg?
     //Or some compression that is supported by the hardware on IOS??
 
-    FILE *fp=open_file(name, ".png", "rb",window_get_os_data(data->window_data));
+    FILE *fp=open_file(name, "png", "rb",window_get_os_data(data->window_data));
 	return internal_load_sprite_from_fp(fp, name, data);
 }
 
@@ -1162,7 +1162,7 @@ float get_font_height(int font, struct GameData *data)
 
 int load_font(const char *name, double font_size, struct GameData *data)
 {
-    FILE *fp = open_file(name,".ttf","rb",window_get_os_data(data->window_data));
+    FILE *fp = open_file(name,"ttf","rb",window_get_os_data(data->window_data));
     if(!fp){
         //TODO(Vidar):Report error somehow...
         return -1;
@@ -1786,22 +1786,6 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
             struct Mesh *mesh = data->meshes[render_mesh->mesh];
             struct Shader *shader = data->shaders[render_mesh->shader];
             /* BOOKMARK(Vidar): OpenGL call
-            if(blend_mode != render_mesh->blend_mode){
-                if(blend_mode == BLEND_MODE_NONE){
-                    glEnable(GL_BLEND);
-                }
-                switch(render_mesh->blend_mode){
-                    case BLEND_MODE_PREMUL:
-                        glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
-                        break;
-                    case BLEND_MODE_MULTIPLY:
-                        glBlendFunc(GL_DST_COLOR,GL_ZERO);
-                        break;
-                    case BLEND_MODE_NONE:
-                        glDisable(GL_BLEND);
-                        break;
-                }
-            }
 			if (scissor_state != render_mesh->scissor_state) {
 				struct ScissorState s = scissor_states[render_mesh->scissor_state];
 				if (s.enabled) {
@@ -1919,33 +1903,6 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect, int w
         for(int i=0;i<list->num;i++){
             struct RenderQuad *render_quad = list->quads + i;
             struct Shader *quad_shader = data->shaders[render_quad->shader];
-            /* BOOKMARK(Vidar): OpenGL call
-            if(shader != quad_shader){
-                glUseProgram(quad_shader);
-                shader = quad_shader;
-            }
-            */
-            /* BOOKMARK(Vidar): OpenGL call
-            if(blend_mode != render_quad.blend_mode){
-                if(blend_mode == BLEND_MODE_NONE){
-                    
-                    glEnable(GL_BLEND);
-                }
-                switch(render_quad.blend_mode){
-                    case BLEND_MODE_PREMUL:
-                        glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
-                        break;
-                    case BLEND_MODE_MULTIPLY:
-                        glBlendFunc(GL_DST_COLOR,GL_ZERO);
-                        break;
-                    case BLEND_MODE_NONE:
-                        glDisable(GL_BLEND);
-                        break;
-                }
-            }
-            */
-            
-            //graphics_set_blend_mode(render_quad.blend_mode);
 
             /* BOOKMARK(Vidar): OpenGL call
 			if (scissor_state != render_quad.scissor_state) {

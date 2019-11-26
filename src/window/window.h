@@ -1,4 +1,4 @@
-
+#include <stdint.h>
 struct WindowData;
 struct GameState;
 struct OSData;
@@ -17,10 +17,5 @@ struct OSData *window_get_os_data(struct WindowData *window)
 struct GraphicsData *window_get_graphics_data(struct WindowData *window)
 ;
 
-/*
-struct Shader *window_compile_shader(const char *vert_filename,
-        const char *frag_filename, enum GraphicsBlendMode blend_mode,
-        char *error_buffer, int error_buffer_len,
-        struct WindowData *window_data)
+uint64_t window_get_current_tick(struct WindowData *window_data)
 ;
-*/
