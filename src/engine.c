@@ -968,17 +968,26 @@ void calculate_mesh_tangents(int num_verts, struct Vec3 *pos_data,
 		struct Vec2 e1_uv = sub_vec2(uv2, uv1);
 		struct Vec2 e2_uv = sub_vec2(uv3, uv1);
 
-		float r = 1.f / (e1_uv.x * e2_uv.y - e1_uv.y * e2_uv.x);
-		struct Vec3 tangent = scale_vec3(r, sub_vec3(scale_vec3(e2_uv.y, e1), scale_vec3(e1_uv.y,e2)));
+		float m = (e1_uv.y * e2_uv.y - e1_uv.y * e2_uv.x);
+		if (m != 0.f) {
+			float r = 1.f / m;
+			struct Vec3 tangent = scale_vec3(r, sub_vec3(scale_vec3(e2_uv.y, e1), scale_vec3(e1_uv.y, e2)));
 
-		for (int d = 0; d < 3; d++) {
-			tangent_data[i1].m[d] += tangent.m[d];
-			tangent_data[i2].m[d] += tangent.m[d];
-			tangent_data[i3].m[d] += tangent.m[d];
+			for (int d = 0; d < 3; d++) {
+				tangent_data[i1].m[d] += tangent.m[d];
+				tangent_data[i2].m[d] += tangent.m[d];
+				tangent_data[i3].m[d] += tangent.m[d];
+			}
 		}
 	}
 	for (int i = 0; i < num_verts; i++) {
-		tangent_data[i] = normalize_vec3(tangent_data[i]);
+		float m = magnitude_vec3(tangent_data[i]);
+		if (m != 0.f) {
+			tangent_data[i] = scale_vec3(1.f / m, tangent_data[i]);
+		}
+		else {
+			tangent_data[i] = vec3(1.f, 0.f, 0.f);
+		};
 	}
 }
 
