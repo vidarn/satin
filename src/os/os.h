@@ -11,9 +11,14 @@ char *get_save_file_name(const char *title);
 char *get_open_file_name(const char *title);
 uint64_t get_current_tick(void);
 size_t get_file_len(FILE *fp);
-int get_num_cores(void);
+int os_get_num_cores(void)
+;
 const char *get_computer_name(void);
-int os_is_key_down(int key);
+int os_is_key_down(int key)
+;
+
+void os_set_clipboard_contents(void* os_data, char* string, size_t len)
+;
 
 extern char os_folder_separator;
 void os_path_strip_leaf(char *path);
