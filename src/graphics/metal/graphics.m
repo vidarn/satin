@@ -136,8 +136,9 @@ void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader, struct Graph
     [graphics->command_encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle indexCount:mesh->num_indices indexType:MTLIndexTypeUInt32 indexBuffer:mesh->index_buffer indexBufferOffset:0];
 }
 
-
-struct Shader *graphics_compile_shader(const char *vert_filename, const char *frag_filename, enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics)
+struct Shader *graphics_compile_shader(const char *vert_filename, const char *frag_filename,
+    enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics,
+    struct WindowData *window_data)
 {
     struct Shader *shader = calloc(1, sizeof(struct Shader));
     id<MTLFunction> vert_function = [graphics->library newFunctionWithName:[[NSString stringWithUTF8String:vert_filename] stringByAppendingString:@"_vert"]];
