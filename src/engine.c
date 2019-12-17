@@ -1836,6 +1836,9 @@ void process_uniforms(int shader, int num_uniforms,
                 case SHADER_UNIFORM_MAT3:
                     glUniformMatrix3fv(loc,u.num,GL_FALSE,u.data);
                     break;
+                case SHADER_UNIFORM_MAT2:
+                    glUniformMatrix2fv(loc,u.num,GL_FALSE,u.data);
+                    break;
                 case SHADER_UNIFORM_VEC4:
                     glUniform4fv(loc,u.num,u.data);
                     break;
