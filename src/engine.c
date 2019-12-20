@@ -752,6 +752,13 @@ int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
     int mesh_index = data->num_meshes;
     data->meshes = realloc(data->meshes,(++data->num_meshes)
                            *sizeof(struct Mesh));
+
+    struct Mesh mesh = data->meshes[mesh_index];
+    glGenVertexArrays(1,&mesh.vertex_array);
+    glGenBuffers(1,&mesh.vertex_buffer);
+    glGenBuffers(1,&mesh.index_buffer);
+    data->meshes[mesh_index] = mesh;
+
 	update_mesh_from_memory(mesh_index, num_verts, pos_data, normal_data, uv_data, tangent_data, num_tris, tri_data, shader, data);
     return mesh_index;
 }
@@ -774,19 +781,16 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
         memcpy(vertex_data + 2*num_verts*3 + num_verts*2,tangent_data,  tangent_data_len);
     }
 
-    struct Mesh mesh;
+    struct Mesh mesh = data->meshes[mesh_index];
     mesh.shader=&(data->shaders[shader]);
-    glGenVertexArrays(1,&mesh.vertex_array);
     glBindVertexArray(mesh.vertex_array);
-    glGenBuffers(1,&mesh.vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER,mesh.vertex_buffer);
     
     mesh.num_verts = num_verts;
     
     glBufferData(GL_ARRAY_BUFFER,vertex_data_len+normal_data_len+uv_map_data_len+tangent_data_len,vertex_data,
                  GL_STATIC_DRAW);
-    //TODO(Vidar):We should be able to free it now, right?
-    //free(vertex_data);
+    free(vertex_data);
     int pos_loc=glGetAttribLocation(mesh.shader->shader,"pos");
     if(pos_loc == -1){
         printf("Error: Could not find \"pos\" attribute in shader\n");
@@ -824,7 +828,6 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
     mesh.num_tris = num_tris;
     int index_data_len = mesh.num_tris*3*sizeof(int);
 
-    glGenBuffers(1,&mesh.index_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,tri_data,
                  GL_STATIC_DRAW);
@@ -860,8 +863,7 @@ int load_custom_mesh_from_memory(int num_verts, int num_tris,
     
     glBufferData(GL_ARRAY_BUFFER,total_data_len,vertex_data,
                  GL_DYNAMIC_DRAW);
-    //TODO(Vidar):We should be able to free it now, right?
-    //free(vertex_data);
+    free(vertex_data);
 	int offset = 0;
 	for (int i = 0; i < num_data_specs; i++) {
 		struct CustomMeshDataSpec spec = data_spec[i];
@@ -888,6 +890,14 @@ int load_custom_mesh_from_memory(int num_verts, int num_tris,
                            *sizeof(struct Mesh));
     data->meshes[mesh_index] = mesh;
     return mesh_index;
+}
+
+void unload_mesh(int mesh, struct GameData* data)
+{
+    struct Mesh* m = data->meshes + mesh;
+    glDeleteBuffers(1, &m->vertex_buffer);
+    glDeleteBuffers(1, &m->index_buffer);
+    glDeleteVertexArrays(1, &m->vertex_array);
 }
 
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data)

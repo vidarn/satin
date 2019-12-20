@@ -143,6 +143,8 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3* pos_dat
 	struct Vec3* normal_data, struct Vec2* uv_data, struct Vec3* tangent_data, int num_tris,
 	int* tri_data, int shader, struct GameData* data)
 ;
+void unload_mesh(int mesh, struct GameData* data)
+;
 void create_sprite_atlas(struct GameData* data)
 ;
 
