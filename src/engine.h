@@ -164,9 +164,11 @@ void calculate_mesh_tangents(int num_verts, struct Vec3* pos_data,
 	struct Vec2* uv_data, struct Vec3* tangent_data, int num_tris, int* tri_data)
 ;
 void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
-    struct Vec3 *normal_data, struct Vec2 *uv_data, struct GameData *data);
+    struct Vec3 *normal_data, struct Vec2 *uv_data, struct Vec2 *tangent_data, struct GameData *data)
+;
 void update_custom_mesh_verts_from_memory(int mesh, int num_data_spect, struct CustomMeshDataSpec *data_spec,
-	struct GameData *data);
+	struct GameData *data)
+;
 int get_mesh_num_verts(int mesh, struct GameData *data);
 void get_mesh_vert_data(int mesh, struct Vec3 *pos_data, struct Vec3 *normal_data,
     struct Vec2 *uv_data, struct GameData *data);
