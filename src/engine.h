@@ -8,6 +8,7 @@ struct RenderContext;
 struct GameState;
 struct FrameData;
 struct WindowData;
+struct OSData;
 
 struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode);
 int update(int ticks, struct InputState input_state, struct GameData *data);
@@ -22,6 +23,11 @@ void *get_custom_data_pointer(struct GameData *data);
 
 void set_common_data_pointer(void * common_data, struct GameData *data);
 void *get_common_data_pointer(struct GameData *data);
+
+struct WindowData *get_window_data(struct GameData *data)
+;
+struct OSData *get_os_data(struct GameData *data)
+;
 
 //Graphics
 struct Color {
@@ -77,6 +83,11 @@ void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
 void render_sprite_screen_scaled_with_shader(int sprite,float x, float y,
     float scale, int shader, struct GraphicsValueSpec *uniforms, int num_uniforms,
     struct RenderContext *context)
+;
+
+float *get_sprite_uv_offset(int sprite, struct GameData *data)
+;
+struct Texture *get_sprite_texture(int sprite, struct GameData *data)
 ;
 
 void set_scissor_state(int enabled, float x1, float y1, float x2, float y2, struct RenderContext* context)

@@ -458,6 +458,17 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     rm->uniforms[1].data = rm->cam;
 }
 
+float *get_sprite_uv_offset(int sprite, struct GameData *data)
+{
+    struct Sprite *s = data->sprites + sprite;
+    return s->uv_offset;
+}
+
+struct Texture *get_sprite_texture(int sprite, struct GameData *data)
+{
+    struct Sprite *s = data->sprites + sprite;
+    return data->textures[s->texture];
+}
 
 void set_scissor_state(int enabled, float x1, float y1, float x2, float y2, struct RenderContext* context)
 {
@@ -589,14 +600,18 @@ int load_mesh(const char *name, struct GameData *data)
         float *normal_data = vertex_data + num_verts*3;
         float *uv_map_data = normal_data + num_verts*3;
         unsigned int face_i = 0;
+        int no_normals = 1;
         for(int i=0;i<num_verts;i++){
             tinyobj_vertex_index_t v = faces[face_i];
             vertex_data[i*3 + 0] = attrib.vertices[v.v_idx*3 + 0];
             vertex_data[i*3 + 1] = attrib.vertices[v.v_idx*3 + 1];
             vertex_data[i*3 + 2] = attrib.vertices[v.v_idx*3 + 2];
-            normal_data[i*3 + 0] = attrib.normals[v.vn_idx*3 + 0];
-            normal_data[i*3 + 1] = attrib.normals[v.vn_idx*3 + 1];
-            normal_data[i*3 + 2] = attrib.normals[v.vn_idx*3 + 2];
+            if(v.vn_idx > 0){
+                normal_data[i*3 + 0] = attrib.normals[v.vn_idx*3 + 0];
+                normal_data[i*3 + 1] = attrib.normals[v.vn_idx*3 + 1];
+                normal_data[i*3 + 2] = attrib.normals[v.vn_idx*3 + 2];
+                no_normals = 0;
+            }
             if(v.vt_idx >= 0){
                 uv_map_data[i*2 + 0] = attrib.texcoords[v.vt_idx*2 + 0];
                 uv_map_data[i*2 + 1] = attrib.texcoords[v.vt_idx*2 + 1];
@@ -628,6 +643,10 @@ int load_mesh(const char *name, struct GameData *data)
         free(idx);
         free(idx_tmp);
         free(vert_to_unique_vert);
+        
+        if(no_normals){
+            calculate_mesh_normals(num_verts, vertex_data, normal_data, num_tris, index_data);
+        }
         
         struct GraphicsValueSpec data_specs[] = {
             {"pos", (uint8_t *)vertex_data, GRAPHICS_VALUE_VEC3},
@@ -703,6 +722,16 @@ int load_mesh(const char *name, struct GameData *data)
         printf("Could not load mesh \"%s\"\n",name);
     }
     return -1;
+}
+
+struct WindowData *get_window_data(struct GameData *data)
+{
+    return data->window_data;
+}
+
+struct OSData *get_os_data(struct GameData *data)
+{
+    return window_get_os_data(data->window_data);
 }
 
 int load_mesh_unit_plane(int shader, struct GameData *data)
@@ -1863,6 +1892,8 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
 			}
             glDrawElements(GL_TRIANGLES, mesh->num_tris*3,GL_UNSIGNED_INT,(void*)0);
              */
+            
+            graphics_set_depth_test(render_mesh->depth_test, data->graphics);
             struct Matrix4 asp_m={0};
             if(aspect<1.f){
                 asp_m.m[0]=1.f;

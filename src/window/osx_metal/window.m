@@ -58,10 +58,10 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
     g_input_state = input_state;    
 }
 
-void satin_update(void)
+void satin_update(struct InputState input_state)
 {
     if(g_game_data){
-        update(0,g_input_state, g_game_data);
+        update(0,input_state, g_game_data);
         g_input_state.num_keys_typed = 0;
         float w = satin_mtk_view.drawableSize.width;
         float h = satin_mtk_view.drawableSize.height;
@@ -70,3 +70,4 @@ void satin_update(void)
         printf("Bad update\n");
     }
 }
+

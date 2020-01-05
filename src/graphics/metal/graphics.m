@@ -2,7 +2,7 @@
 #import <MetalKit/MetalKit.h>
 
 #include "os/os.h"
-#include "graphics.h"
+#include "graphics/graphics.h"
 
 struct GraphicsData
 {
