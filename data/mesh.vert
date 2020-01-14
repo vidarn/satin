@@ -1,7 +1,7 @@
 in vec3 pos;
 in vec3 normal;
 in vec3 uv_map;
-in vec3 tangent;
+in vec4 tangent;
 uniform mat4 model_matrix;
 uniform mat4 view_matrix;
 uniform mat4 proj_matrix;
@@ -16,8 +16,8 @@ void main()
 	gl_Position = proj_matrix * view_matrix * pos;
 
     vec3 n = normalize((model_matrix * vec4(normal,0.f)).xyz);
-    vec3 t = normalize((model_matrix * vec4(tangent,0.f)).xyz);
-	vec3 b = normalize(cross(n,t));
+    vec3 t = normalize((model_matrix * vec4(tangent.xyz,0.f)).xyz);
+	vec3 b = tangent.w*normalize(cross(n,t));
 	normal_matrix_out = mat3(t,b,n);
     uv_map_out = uv_map;
 }

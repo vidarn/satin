@@ -770,7 +770,7 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
     int vertex_data_len=num_verts*3*sizeof(float);
     int normal_data_len=num_verts*3*sizeof(float);
     int uv_map_data_len=num_verts*2*sizeof(float);
-    int tangent_data_len=num_verts*3*sizeof(float);
+    int tangent_data_len=num_verts*4*sizeof(float);
     float *vertex_data=calloc(vertex_data_len+normal_data_len+uv_map_data_len+tangent_data_len,1);
     memcpy(vertex_data,pos_data,vertex_data_len);
     memcpy(vertex_data + num_verts*3,normal_data,normal_data_len);
@@ -821,7 +821,7 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
             printf("Error: Could not find \"tangent\" attribute in shader\n");
         }
         glEnableVertexAttribArray(tangent_loc);
-        glVertexAttribPointer(tangent_loc,3,GL_FLOAT,GL_FALSE,
+        glVertexAttribPointer(tangent_loc,4,GL_FLOAT,GL_FALSE,
                               0,(void*)(intptr_t)(vertex_data_len+normal_data_len+uv_map_data_len));
     }
     
