@@ -181,6 +181,7 @@ float sum_values(float *values, int num);
 enum MouseState {
     MOUSE_NOTHING,
     MOUSE_CLICKED,
+    MOUSE_DOUBLECLICKED,
     MOUSE_DRAG,
     MOUSE_DRAG_RELEASE,
 };

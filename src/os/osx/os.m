@@ -20,8 +20,9 @@ FILE *open_file(const char *filename, const char *extension, const char *mode, s
         printf("Could not load bundle\n");
     }
     NSString *filename_string = [NSString stringWithUTF8String:filename];
+    NSString *path_string = [@"data/" stringByAppendingString:filename_string];
     NSString *extension_string = [NSString stringWithUTF8String:extension];
-    NSString *resourcePath = [main_bundle pathForResource:filename_string
+    NSString *resourcePath = [main_bundle pathForResource:path_string
         ofType:extension_string];
     FILE *fp = fopen([resourcePath cStringUsingEncoding:NSUTF8StringEncoding], mode);
     return fp;
