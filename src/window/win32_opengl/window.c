@@ -4,6 +4,7 @@
 #include <Windows.h>
 #include <Xinput.h>
 #include <stdio.h>
+#include <math.h>
 float controller_left_thumb_deadzone = (float)XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE / 32768.f;
 float controller_right_thumb_deadzone = (float)XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE / 32768.f;
 

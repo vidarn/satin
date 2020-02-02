@@ -1045,8 +1045,7 @@ int load_shader_from_string(const char* vert_source, const char * frag_source,
 int load_image_from_memory(int sprite_w, int sprite_h,
 	unsigned char *sprite_data, struct GameData *data)
 {
-    /*BOOKMARK(Vidar): OpenGL
-    int texture = add_texture(sprite_data, sprite_w, sprite_h,GL_RGBA,data);
+    int texture = add_texture(sprite_data, sprite_w, sprite_h,GRAPHICS_PIXEL_FORMAT_RGBA,data);
     struct Sprite s;
     s.uv_offset[0] = 0.f;
     s.uv_offset[1] = 0.f;
@@ -1071,7 +1070,6 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     data->num_sprites++;
 
     return data->num_sprites-1;
-     */
     return 0;
 }
 
@@ -1262,8 +1260,8 @@ void create_sprite_atlas(struct GameData *data)
     int pad = 1;
     //printf("Creating atlas\n");
     //TODO(Vidar):We assume that one 2048x2048 texture is enough for now
-    const int w = 2048;
-    const int h = 2048;
+    const int w = 4096;
+    const int h = 4096;
     #define num_nodes 4096
     stbrp_node nodes[num_nodes];
     stbrp_context context;

@@ -5,6 +5,7 @@ set(VLIB_INC_DIR ../vlib/src/libs)
 set(VLIB_SRC
 	${VLIB_INC_DIR}/sort/sort.c
 	${VLIB_INC_DIR}/linalg/linalg.c
+	${VLIB_INC_DIR}/hash_map/hash_map.c
 )
 project(satin)
 include_directories(${VLIB_INC_DIR})
