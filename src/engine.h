@@ -109,6 +109,8 @@ int load_image_from_memory(int sprite_w, int sprite_h,
 	;
 int load_image(const char* name, struct GameData* data)
 ;
+int load_image_from_file(const char* filename, struct GameData* data)
+;
 
 int load_sprite_from_memory(int sprite_w, int sprite_h,
     unsigned char *sprite_data, struct GameData *data);

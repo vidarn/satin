@@ -1073,14 +1073,26 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     return 0;
 }
 
-int load_image(const char *name, struct GameData *data)
+static int load_image_from_fp(FILE* fp, struct GameData* data)
 {
     int sprite_channels, sprite_w, sprite_h;
-    FILE *fp=open_file(name, "png", "rb",window_get_os_data(data->window_data));
-    unsigned char *sprite_data = stbi_load_from_file(fp, &sprite_w,
-        &sprite_h, &sprite_channels, 4);
-    fclose(fp);
-	return load_image_from_memory(sprite_w, sprite_h, sprite_data, data);
+	if (fp) {
+		unsigned char* sprite_data = stbi_load_from_file(fp, &sprite_w,
+			&sprite_h, &sprite_channels, 4);
+		fclose(fp);
+		return load_image_from_memory(sprite_w, sprite_h, sprite_data, data);
+	}
+	return 0;
+}
+
+int load_image(const char *name, struct GameData *data)
+{
+    return load_image_from_fp(open_file(name, "png", "rb",window_get_os_data(data->window_data)),data);
+}
+
+int load_image_from_file(const char* filename, struct GameData* data)
+{
+    return load_image_from_fp(fopen(filename,"rb"),data);
 }
 
 void update_sprite_from_memory(int sprite, unsigned char *sprite_data,
@@ -1591,6 +1603,26 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
         int num_data_specs = sizeof(data_specs)/sizeof(*data_specs);
         data->quad_mesh = graphics_create_mesh(data_specs, num_data_specs, 4, (int*)quad_render_index, 6, data->graphics);
     }
+
+	//NOTE(Vidar):Create a default "invalid" sprite so that it is allways sprite 0
+	{
+		int res = 128;
+		uint8_t* pixels = calloc(res * res, 4);
+		for (int y = 0; y < res; y++) {
+			for (int x = 0; x < res; x++) {
+				//uint8_t val = x > y  ^ res-x > y? 255 : 0;
+				int delta1 = abs(x - y);
+				int delta2 = abs(res - x - y);
+				uint8_t val = delta1 < 4 || delta2 < 4 ? 255 : 0;
+				int i = x + y * res;
+				pixels[i * 4 + 0] = val;
+				pixels[i * 4 + 1] = val;
+				pixels[i * 4 + 2] = val;
+				pixels[i * 4 + 3] = 255;
+			}
+		}
+		load_image_from_memory(res, res, pixels, data);
+	}
     
     /* BOOKMARK(Vidar): OpenGL call
     data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
