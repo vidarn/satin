@@ -544,7 +544,9 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			case WM_RBUTTONUP:
 			{
 				input_state.mouse_down_right = 0;
-				input_state.mouse_state_right = MOUSE_NOTHING;
+				if (input_state.mouse_state_right != MOUSE_CLICKED) {
+					input_state.mouse_state_right = MOUSE_NOTHING;
+				}
 				break;
 			}
 			case WM_LBUTTONDOWN:
@@ -561,7 +563,9 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			case WM_LBUTTONUP:
 			{
 				input_state.mouse_down = 0;
-				input_state.mouse_state = MOUSE_NOTHING;
+				if(input_state.mouse_state!=MOUSE_CLICKED){
+					input_state.mouse_state = MOUSE_NOTHING;
+				}
 				break;
 			}
 			case WM_MBUTTONDOWN:
@@ -578,7 +582,9 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 			case WM_MBUTTONUP:
 			{
 				input_state.mouse_down_middle = 0;
-				input_state.mouse_state_middle = MOUSE_NOTHING;
+				if (input_state.mouse_state_middle != MOUSE_CLICKED) {
+					input_state.mouse_state_middle = MOUSE_NOTHING;
+				}
 				break;
 			}
 			case WM_MOUSEWHEEL:

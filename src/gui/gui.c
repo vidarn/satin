@@ -65,6 +65,9 @@ void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, stru
 	ctx->input.mouse.delta.y = dy;
     ctx->input.mouse.prev.x = mx-dx;
     ctx->input.mouse.prev.y = my-dy;
+    if (input_state.mouse_state == MOUSE_CLICKED) {
+        input_state.mouse_down = 1;
+    }
     nk_input_button(ctx, NK_BUTTON_LEFT, mx, my, input_state.mouse_down);
 	ctx->input.mouse.scroll_delta = nk_vec2(0.f,sy);
     //TODO(Vidar): Provide more input info
