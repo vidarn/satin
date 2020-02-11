@@ -101,8 +101,10 @@ void render_to_memory_float(int w, int h, float *pixels,
 float get_string_render_width(int font_id, const char *text, int len,
     struct GameData *data);
 float get_font_height(int font, struct GameData *data);
-int load_font(const char *name, double font_size,
-    struct GameData *data);
+int load_font(const char *name, double font_size, struct GameData *data)
+;
+int load_font_from_filename(const char* filename, double font_size, struct GameData* data)
+;
 
 int load_image_from_memory(int sprite_w, int sprite_h,
 	unsigned char* sprite_data, struct GameData* data)

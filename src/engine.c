@@ -1199,9 +1199,8 @@ float get_font_height(int font, struct GameData *data)
     return data->fonts[font].height*0.25f/(float)reference_resolution;
 }
 
-int load_font(const char *name, double font_size, struct GameData *data)
+int load_font_from_fp(FILE *fp, double font_size, struct GameData *data)
 {
-    FILE *fp = open_file(name,"ttf","rb",window_get_os_data(data->window_data));
     if(!fp){
         //TODO(Vidar):Report error somehow...
         return -1;
@@ -1266,14 +1265,25 @@ int load_font(const char *name, double font_size, struct GameData *data)
     return ret;
 }
 
+int load_font(const char* name, double font_size, struct GameData* data) {
+    FILE *fp = open_file(name,"ttf","rb",window_get_os_data(data->window_data));
+	load_font_from_fp(fp, font_size, data);
+}
+
+int load_font_from_filename(const char* filename, double font_size, struct GameData* data) {
+	FILE* fp = fopen(filename, "rb");
+	load_font_from_fp(fp, font_size, data);
+}
+
+
 //TODO(Vidar):Pad the sprites
 void create_sprite_atlas(struct GameData *data)
 {
     int pad = 1;
     //printf("Creating atlas\n");
     //TODO(Vidar):We assume that one 2048x2048 texture is enough for now
-    const int w = 4096;
-    const int h = 4096;
+    const int w = 2048;
+    const int h = 2048;
     #define num_nodes 4096
     stbrp_node nodes[num_nodes];
     stbrp_context context;
@@ -1339,6 +1349,7 @@ void create_sprite_atlas(struct GameData *data)
 		if (sprite_data->should_be_packed) {
 			sprite->texture = texture_id;
 		}
+		sprite_data->should_be_packed = 0;
         sprite_data++;
         sprite++;
     }
