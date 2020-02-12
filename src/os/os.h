@@ -49,3 +49,7 @@ int os_list_resource_entries(const char* data_path, const char** entries, int ma
 ;
 int os_does_file_exist(const char *filename)
 ;
+int os_does_folder_exist(const char *path)
+;
+int os_make_folder(const char* path)
+;

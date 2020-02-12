@@ -798,6 +798,22 @@ int os_does_file_exist(const char *filename)
 		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 
+int os_does_folder_exist(const char *path)
+{
+	DWORD dwAttrib = GetFileAttributesA(path);
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+int os_make_folder(const char* path)
+{
+	if (!os_does_folder_exist(path)) {
+		return CreateDirectoryA(path, 0);
+	}
+	return 1;
+}
+
 void save_screenshot(const char* filename)
 {
 	const char* arg = "savescreenshotfull ";
