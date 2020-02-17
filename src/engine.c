@@ -73,6 +73,7 @@ struct GameData{
 	uint32_t sprite_vertex_buffer;
     int sprite_shader;
     int line_shader;
+    int fill_shader;
 	//uint32_t quad_vertex_array;
 	//uint32_t quad_vertex_buffer;
     struct Mesh *quad_mesh;
@@ -401,6 +402,22 @@ void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
     render_line_screen(x2, y1, x2, y2, thickness, color, context);
     render_line_screen(x1, y1, x2, y1, thickness, color, context);
     render_line_screen(x1, y2, x2, y2, thickness, color, context);
+}
+
+void render_rect_fill_screen(float x1, float y1, float x2, float y2,
+	struct Color color, struct RenderContext* context)
+{
+	float thickness = 0.001f;
+	struct Matrix3 m = {
+		x2 - x1, 0, 0.f,
+		0, y2 - y1, 0.f,
+		x1 + context->offset_x, y1 + context->offset_y, 1.0f,
+	};
+	struct GraphicsValueSpec uniforms[] = {
+        {"color", &color, GRAPHICS_VALUE_VEC4, 1},
+	};
+	int num_uniforms = sizeof(uniforms) / sizeof(*uniforms);
+	render_quad(context->data->fill_shader, m, uniforms, num_uniforms, context);
 }
 
 void render_mesh(int mesh, int shader, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
@@ -1606,6 +1623,7 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 	memcpy(data->game_state_types, game_states, num_game_states * sizeof(struct GameState));
     
     data->line_shader = load_shader("line", "line", GRAPHICS_BLEND_MODE_PREMUL , data);
+    data->fill_shader = load_shader("fill", "fill", GRAPHICS_BLEND_MODE_PREMUL , data);
     data->sprite_shader = load_shader("sprite", "sprite", GRAPHICS_BLEND_MODE_PREMUL , data);
     {
         struct GraphicsValueSpec data_specs[] = {

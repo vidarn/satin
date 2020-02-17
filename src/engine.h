@@ -62,6 +62,9 @@ void render_line_screen(float x1, float y1, float x2, float y2, float thickness,
     struct Color color, struct RenderContext *context);
 void render_rect_screen(float x1, float y1, float x2, float y2, float thickness,
     struct Color color, struct RenderContext *context);
+void render_rect_fill_screen(float x1, float y1, float x2, float y2,
+	struct Color color, struct RenderContext* context)
+;
 
 void render_mesh(int mesh, int shader, struct Matrix4 mat, struct GraphicsValueSpec *uniforms,
                  int num_uniforms, struct RenderContext *context)
