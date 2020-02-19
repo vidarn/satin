@@ -268,3 +268,30 @@ struct GameState {
 };
 
 
+enum RenderCoordType {
+	RC_PIXELS,
+	RC_WINDOW,
+	RC_CANVAS,
+};
+
+struct RenderCoord {
+	int type;
+	float c[3];
+};
+
+struct RenderCoord c1p(float x);
+struct RenderCoord c2p(float x, float y);
+struct RenderCoord c3p(float x, float y, float z);
+struct RenderCoord c1w(float x);
+struct RenderCoord c2w(float x, float y);
+struct RenderCoord c3w(float x, float y, float z);
+struct RenderCoord c1c(float x);
+struct RenderCoord c2c(float x, float y);
+struct RenderCoord c3c(float x, float y, float z);
+
+void render_rect(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
+	float *color, struct RenderContext* context)
+;
+void render_rect_fill(struct RenderCoord p1, struct RenderCoord p2,
+	float *color, struct RenderContext* context)
+;

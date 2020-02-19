@@ -15,6 +15,8 @@ struct WindowData {
 	HWND parent_hWnd;
 	HICON icon;
 	float min_x, max_x, min_y, max_y;
+	int framebuffer_w;
+	int framebuffer_h;
 };
 
 struct WindowProcParams {
@@ -512,6 +514,8 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				window_data->min_y -= pad;
 				window_data->max_y += pad;
 			}
+			window_data->framebuffer_w = framebuffer_w;
+			window_data->framebuffer_h = framebuffer_h;
 
 			LARGE_INTEGER current_tick, delta_ticks;
 			QueryPerformanceCounter(&current_tick);
@@ -567,4 +571,10 @@ void window_get_extents(float *x_min, float *x_max, float *y_min, float *y_max,
     *x_max = window->max_x;
     *y_min = window->min_y;
     *y_max = window->max_y;
+}
+
+void window_get_res(float* w, float* h, struct WindowData* window)
+{
+	*w = (float)window->framebuffer_w;
+	*h = (float)window->framebuffer_h;
 }

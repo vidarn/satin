@@ -171,6 +171,77 @@ void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniform
     */
 }
 
+
+struct RenderCoord c1p(float x) { struct RenderCoord rc = { RC_PIXELS,x,0 }; return rc; }
+struct RenderCoord c2p(float x, float y) { struct RenderCoord rc = { RC_PIXELS,x,y,0 }; return rc; }
+struct RenderCoord c3p(float x, float y, float z) { struct RenderCoord rc = { RC_PIXELS,x,y,z }; return rc; }
+struct RenderCoord c1w(float x) { struct RenderCoord rc = { RC_WINDOW,x,0 }; return rc; }
+struct RenderCoord c2w(float x, float y) { struct RenderCoord rc = { RC_WINDOW,x,y,0 }; return rc; }
+struct RenderCoord c3w(float x, float y, float z) { struct RenderCoord rc = { RC_WINDOW,x,y,z }; return rc; }
+struct RenderCoord c1c(float x) { struct RenderCoord rc = { RC_CANVAS,x,0 }; return rc; }
+struct RenderCoord c2c(float x, float y) { struct RenderCoord rc = { RC_CANVAS,x,y,0 }; return rc; }
+struct RenderCoord c3c(float x, float y, float z) { struct RenderCoord rc = { RC_CANVAS,x,y,z }; return rc; }
+
+struct RenderCoord render_coord_convert(struct RenderCoord rc, uint32_t to_type, struct RenderContext *context) {
+	struct RenderCoord ret = rc;
+	ret.type = to_type;
+    struct GameData *data = context->data;
+	if (to_type == RC_WINDOW) {
+		struct WindowData* window = get_window_data(data);
+		if (rc.type == RC_CANVAS) {
+			float x_min, x_max, y_min, y_max;
+			window_get_extents(&x_min, &x_max, &y_min, &y_max, window);
+			ret.c[0] = (rc.c[0] - x_min) / (x_max - x_min);
+			ret.c[1] = (rc.c[1] - y_min) / (y_max - y_min);
+		}
+		if (rc.type == RC_PIXELS) {
+			float w, h;
+			window_get_res(&w, &h, window);
+			ret.c[0] /= w;
+			ret.c[1] /= h;
+		}
+	}
+	if (to_type == RC_CANVAS) {
+		struct WindowData* window = get_window_data(data);
+		float x_min, x_max, y_min, y_max;
+		window_get_extents(&x_min, &x_max, &y_min, &y_max, window);
+		if (rc.type == RC_WINDOW) {
+			ret.c[0] = rc.c[0] * (x_max - x_min) + x_min;
+			ret.c[1] = rc.c[1] * (y_max - y_min) + y_min;
+		}
+		if (rc.type == RC_PIXELS) {
+			float w, h;
+			window_get_res(&w, &h, window);
+			ret.c[0] = rc.c[0]/w * (x_max - x_min) + x_min;
+			ret.c[1] = rc.c[1]/h * (y_max - y_min) + y_min;
+		}
+	}
+	//TODO(Vidar):Implement the rest...
+	return ret;
+}
+
+void render_rect(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
+	float *color, struct RenderContext* context)
+{
+	//TODO(Vidar):Implement
+}
+void render_rect_fill(struct RenderCoord p1, struct RenderCoord p2,
+	float *color, struct RenderContext* context)
+{
+	struct RenderCoord p1w = render_coord_convert(p1, RC_CANVAS, context);
+	struct RenderCoord p2w = render_coord_convert(p2, RC_CANVAS, context);
+	struct Matrix3 m = {
+		p2w.c[0] -p1w.c[0], 0, 0.f,
+		0, p2w.c[1] -p1w.c[1], 0.f,
+		p1w.c[0], p1w.c[1], 1.0f,
+	};
+	struct GraphicsValueSpec uniforms[] = {
+        {"color", color, GRAPHICS_VALUE_VEC4, 1},
+	};
+	int num_uniforms = sizeof(uniforms) / sizeof(*uniforms);
+	render_quad(context->data->fill_shader, m, uniforms, num_uniforms, context);
+}
+
 //TODO(Vidar):Should we be able to specity the anchor point when rendering
 // stuff?
 
