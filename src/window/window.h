@@ -19,3 +19,7 @@ struct GraphicsData *window_get_graphics_data(struct WindowData *window)
 
 uint64_t window_get_current_tick(struct WindowData *window_data)
 ;
+
+void window_get_extents(float *x_min, float *x_max, float *y_min, float *y_max,
+    struct WindowData *window)
+;

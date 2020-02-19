@@ -2076,9 +2076,7 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
             scale=1.f/aspect;
         }
         
-     /*BOOKMARK(Vidar):OpenGl
-        glViewport(0, 0, w, h);
-*/
+        graphics_set_viewport(0, 0, w, h);
         graphics_begin_render_pass(&frame_data->clear_color.r, data->graphics);
         if(frame_data->clear){
             graphics_clear(data->graphics);
@@ -2196,24 +2194,9 @@ void render_to_memory_float(int w, int h, float *pixels,
 
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data)
 {
-    //BOOKMARK(Vidar):OpenGL
     
     //glBindFramebuffer(GL_FRAMEBUFFER, 0);
     render_internal(framebuffer_w, framebuffer_h, data->frame_data, data);
-    
-    /*float min_size =
-        (float)(framebuffer_w > framebuffer_h ? framebuffer_h : framebuffer_w);
-    float pad = fabsf((float)(framebuffer_w - framebuffer_h))*0.5f/min_size;
-    data->window_min_x = 0.f; data->window_max_x = 1.f;
-    data->window_min_y = 0.f; data->window_max_y = 1.f;
-    if(framebuffer_w > framebuffer_h){
-        data->window_min_x -= pad;
-        data->window_max_x += pad;
-    }else{
-        data->window_min_y -= pad;
-        data->window_max_y += pad;
-    }
-     */
 }
 
 int update(int ticks, struct InputState input_state, struct GameData *data)

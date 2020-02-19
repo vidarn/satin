@@ -14,6 +14,7 @@ struct WindowData {
 	HWND hWnd;
 	HWND parent_hWnd;
 	HICON icon;
+	float min_x, max_x, min_y, max_y;
 };
 
 struct WindowProcParams {
@@ -497,6 +498,21 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				}
 			}
 
+			float framebuffer_w = window_proc_params.framebuffer_w;
+			float framebuffer_h = window_proc_params.framebuffer_h;
+			float min_size =
+				(float)(framebuffer_w > framebuffer_h ? framebuffer_h : framebuffer_w);
+			float pad = fabsf((float)(framebuffer_w - framebuffer_h))*0.5f/min_size;
+			window_data->min_x = 0.f; window_data->max_x = 1.f;
+			window_data->min_y = 0.f; window_data->max_y = 1.f;
+			if(framebuffer_w > framebuffer_h){
+				window_data->min_x -= pad;
+				window_data->max_x += pad;
+			}else{
+				window_data->min_y -= pad;
+				window_data->max_y += pad;
+			}
+
 			LARGE_INTEGER current_tick, delta_ticks;
 			QueryPerformanceCounter(&current_tick);
 			delta_ticks.QuadPart = current_tick.QuadPart - last_tick.QuadPart;
@@ -504,7 +520,7 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 			delta_ticks.QuadPart *= TICKS_PER_SECOND;
 			delta_ticks.QuadPart /= counter_frequency.QuadPart;
 			wait_for_event = update((int)delta_ticks.QuadPart, input_state, game_data);
-			render(window_proc_params.framebuffer_w, window_proc_params.framebuffer_h, game_data);
+			render(framebuffer_w, framebuffer_h, game_data);
 			glFlush();
 			SwapBuffers(hDC);
 			input_state.prev_mouse_state = input_state.mouse_state;
@@ -542,4 +558,13 @@ struct OSData *window_get_os_data(struct WindowData *window)
 struct GraphicsData *window_get_graphics_data(struct WindowData *window)
 {
     return window->graphics_data;
+}
+
+void window_get_extents(float *x_min, float *x_max, float *y_min, float *y_max,
+    struct WindowData *window)
+{
+    *x_min = window->min_x;
+    *x_max = window->max_x;
+    *y_min = window->min_y;
+    *y_max = window->max_y;
 }

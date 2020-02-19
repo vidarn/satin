@@ -57,6 +57,8 @@ extern int graphics_value_nums[];
 
 struct GraphicsData *graphics_create(void * param)
 ;
+void graphics_set_viewport(int x, int y, int w, int h)
+;
 void graphics_begin_render_pass(float *clear_rgba, struct GraphicsData *graphics)
 ;
 void graphics_end_render_pass(struct GraphicsData *graphics)

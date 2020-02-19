@@ -79,6 +79,11 @@ struct GraphicsData *graphics_create(void * param)
     return graphics;
 }
 
+void graphics_set_viewport(int x, int y, int w, int h)
+{
+    glViewport(x, y, w, h);
+}
+
 void graphics_begin_render_pass(float *clear_rgba, struct GraphicsData *graphics)
 {
     memcpy(graphics->clear_color, clear_rgba, 4*4);
