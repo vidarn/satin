@@ -272,6 +272,7 @@ enum RenderCoordType {
 	RC_PIXELS,
 	RC_WINDOW,
 	RC_CANVAS,
+	RC_SCALE,
 };
 
 struct RenderCoord {
@@ -288,6 +289,13 @@ struct RenderCoord c3w(float x, float y, float z);
 struct RenderCoord c1c(float x);
 struct RenderCoord c2c(float x, float y);
 struct RenderCoord c3c(float x, float y, float z);
+struct RenderCoord c1s(float x);
+struct RenderCoord c2s(float x, float y);
+struct RenderCoord c3s(float x, float y, float z);
+struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct RenderContext* context)
+;
+struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct RenderContext* context)
+;
 
 void render_rect(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
 	float *color, struct RenderContext* context)

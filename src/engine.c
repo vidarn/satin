@@ -181,8 +181,21 @@ struct RenderCoord c3w(float x, float y, float z) { struct RenderCoord rc = { RC
 struct RenderCoord c1c(float x) { struct RenderCoord rc = { RC_CANVAS,x,0 }; return rc; }
 struct RenderCoord c2c(float x, float y) { struct RenderCoord rc = { RC_CANVAS,x,y,0 }; return rc; }
 struct RenderCoord c3c(float x, float y, float z) { struct RenderCoord rc = { RC_CANVAS,x,y,z }; return rc; }
+struct RenderCoord c1s(float x) { struct RenderCoord rc = { RC_SCALE,x,0 }; return rc; }
+struct RenderCoord c2s(float x, float y) { struct RenderCoord rc = { RC_SCALE,x,y,0 }; return rc; }
+struct RenderCoord c3s(float x, float y, float z) { struct RenderCoord rc = { RC_SCALE,x,y,z }; return rc; }
+struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct RenderContext *context)
+{
+    cconvert(b, a.type, context);
+    a.c[0] += b.c[0];
+    a.c[1] += b.c[1];
+    a.c[2] += b.c[2];
+    return a;
+}
 
-struct RenderCoord render_coord_convert(struct RenderCoord rc, uint32_t to_type, struct RenderContext *context) {
+struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct RenderContext *context)
+{
+    //TODO(Vidar):Take camera into account???
 	struct RenderCoord ret = rc;
 	ret.type = to_type;
     struct GameData *data = context->data;
@@ -216,24 +229,66 @@ struct RenderCoord render_coord_convert(struct RenderCoord rc, uint32_t to_type,
 			ret.c[1] = rc.c[1]/h * (y_max - y_min) + y_min;
 		}
 	}
-	//TODO(Vidar):Implement the rest...
+	if (to_type == RC_PIXELS) {
+		struct WindowData* window = get_window_data(data);
+		float w, h;
+		window_get_res(&w, &h, window);
+		if (rc.type == RC_WINDOW) {
+			ret.c[0] *= w;
+			ret.c[1] *= h;
+		}
+		if (rc.type == RC_CANVAS) {
+			float x_min, x_max, y_min, y_max;
+			window_get_extents(&x_min, &x_max, &y_min, &y_max, window);
+			ret.c[0] = (rc.c[0] - x_min) / (x_max - x_min)*w;
+			ret.c[1] = (rc.c[1] - y_min) / (y_max - y_min)*h;
+		}
+	}
 	return ret;
+}
+
+void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
+	float *color, struct RenderContext *context)
+{
+	p1 = cconvert(p1, RC_CANVAS, context);
+	p2 = cconvert(p2, RC_CANVAS, context);
+	float t = cconvert(thickness, RC_CANVAS, context).c[0];
+    float dx1 = (p2.c[0]-p1.c[0]);
+    float dy1 = (p2.c[1]-p1.c[1]);
+    float mag = sqrtf(dx1*dx1 + dy1*dy1);
+    float dx2 = -dy1/mag*t;
+    float dy2 =  dx1/mag*t;
+    struct Matrix3 m= {
+        dx1, dy1, 0.f,
+        dx2, dy2, 0.f,
+        p1.c[0], p1.c[1], 1.0f,
+    };
+    struct GraphicsValueSpec uniforms[] = {
+        {"color", &color, GRAPHICS_VALUE_VEC4, 1},
+    };
+    int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
+    render_quad(context->data->line_shader, m, uniforms, num_uniforms, context);
 }
 
 void render_rect(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
 	float *color, struct RenderContext* context)
 {
-	//TODO(Vidar):Implement
+	p1 = cconvert(p1, RC_CANVAS, context);
+	p2 = cconvert(p2, RC_CANVAS, context);
+    render_line(p1, c2c(p1.c[0],p2.c[1]), thickness, color, context);
+    render_line(c2c(p2.c[0],p1.c[1]), p2, thickness, color, context);
+    render_line(p1, c2c(p2.c[0],p1.c[1]), thickness, color, context);
+    render_line(c2c(p1.c[0],p2.c[1]), p2, thickness, color, context);
 }
 void render_rect_fill(struct RenderCoord p1, struct RenderCoord p2,
 	float *color, struct RenderContext* context)
 {
-	struct RenderCoord p1w = render_coord_convert(p1, RC_CANVAS, context);
-	struct RenderCoord p2w = render_coord_convert(p2, RC_CANVAS, context);
+	struct RenderCoord p1c = cconvert(p1, RC_CANVAS, context);
+	struct RenderCoord p2c = cconvert(p2, RC_CANVAS, context);
 	struct Matrix3 m = {
-		p2w.c[0] -p1w.c[0], 0, 0.f,
-		0, p2w.c[1] -p1w.c[1], 0.f,
-		p1w.c[0], p1w.c[1], 1.0f,
+		p2c.c[0] -p1c.c[0], 0, 0.f,
+		0, p2c.c[1] -p1c.c[1], 0.f,
+		p1c.c[0], p1c.c[1], 1.0f,
 	};
 	struct GraphicsValueSpec uniforms[] = {
         {"color", color, GRAPHICS_VALUE_VEC4, 1},
