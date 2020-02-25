@@ -171,6 +171,36 @@ void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniform
     */
 }
 
+//TODO(Vidar):Should we be able to specity the anchor point when rendering
+// stuff?
+
+static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y,
+    float override_width, float width, struct Color color, int shader,
+    struct GraphicsValueSpec *uniforms_arg, int num_uniforms_arg,
+    struct RenderContext *context)
+{
+    float sprite_scale = 1.f/(float)reference_resolution;
+    float w = width*sprite_scale*0.5f;
+    float h = w*sprite->inv_aspect;
+    struct Matrix3 m= {
+        w, 0.f, 0.f,
+        0.f, h, 0.f,
+        x+context->offset_x, y+context->offset_y, 1.0f,
+    };
+    struct GraphicsValueSpec uniforms[32] = {
+        {"color",   &color,     GRAPHICS_VALUE_VEC4, 1},
+        {"sprite_uv",  sprite->uv_offset,    GRAPHICS_VALUE_VEC4, 1},
+        {"sprite",  context->data->textures[sprite->texture],    GRAPHICS_VALUE_TEX2, 1},
+    };
+    int num_uniforms = 3;
+    for(int i=0;i<num_uniforms_arg;i++){
+        uniforms[i+num_uniforms] = uniforms_arg[i];
+    }
+    num_uniforms += num_uniforms_arg;
+    render_quad(shader, m, uniforms, num_uniforms, context);
+}
+
+
 
 struct RenderCoord c1p(float x) { struct RenderCoord rc = { RC_PIXELS,x,0 }; return rc; }
 struct RenderCoord c2p(float x, float y) { struct RenderCoord rc = { RC_PIXELS,x,y,0 }; return rc; }
@@ -186,10 +216,18 @@ struct RenderCoord c2s(float x, float y) { struct RenderCoord rc = { RC_SCALE,x,
 struct RenderCoord c3s(float x, float y, float z) { struct RenderCoord rc = { RC_SCALE,x,y,z }; return rc; }
 struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct RenderContext *context)
 {
-    cconvert(b, a.type, context);
+    b = cconvert(b, a.type, context);
     a.c[0] += b.c[0];
     a.c[1] += b.c[1];
     a.c[2] += b.c[2];
+    return a;
+}
+struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b, struct RenderContext *context)
+{
+    b = cconvert(b, a.type, context);
+    a.c[0] -= b.c[0];
+    a.c[1] -= b.c[1];
+    a.c[2] -= b.c[2];
     return a;
 }
 
@@ -250,9 +288,13 @@ struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct Rend
 void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
 	float *color, struct RenderContext *context)
 {
+	//TODO(Vidar):We should do all drawing in window coordinates instead...
 	p1 = cconvert(p1, RC_CANVAS, context);
 	p2 = cconvert(p2, RC_CANVAS, context);
-	float t = cconvert(thickness, RC_CANVAS, context).c[0];
+	struct RenderCoord tzero = { thickness.type,0.f };
+	struct RenderCoord tc = csubtract(cconvert(thickness, RC_CANVAS, context) , cconvert(tzero,RC_CANVAS, context), context);
+	float t = tc.c[0];
+
     float dx1 = (p2.c[0]-p1.c[0]);
     float dy1 = (p2.c[1]-p1.c[1]);
     float mag = sqrtf(dx1*dx1 + dy1*dy1);
@@ -264,7 +306,7 @@ void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoor
         p1.c[0], p1.c[1], 1.0f,
     };
     struct GraphicsValueSpec uniforms[] = {
-        {"color", &color, GRAPHICS_VALUE_VEC4, 1},
+        {"color", color, GRAPHICS_VALUE_VEC4, 1},
     };
     int num_uniforms = sizeof(uniforms)/sizeof(*uniforms);
     render_quad(context->data->line_shader, m, uniforms, num_uniforms, context);
@@ -297,33 +339,47 @@ void render_rect_fill(struct RenderCoord p1, struct RenderCoord p2,
 	render_quad(context->data->fill_shader, m, uniforms, num_uniforms, context);
 }
 
-//TODO(Vidar):Should we be able to specity the anchor point when rendering
-// stuff?
-
-static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y,
-    float override_width, float width, struct Color color, int shader,
-    struct GraphicsValueSpec *uniforms_arg, int num_uniforms_arg,
-    struct RenderContext *context)
+struct RenderCoord render_char(int char_index, int font_id, struct RenderCoord p,
+    float *color, struct RenderContext *context)
 {
-    float sprite_scale = 1.f/(float)reference_resolution;
-    float w = width*sprite_scale*0.5f;
-    float h = w*sprite->inv_aspect;
-    struct Matrix3 m= {
-        w, 0.f, 0.f,
-        0.f, h, 0.f,
-        x+context->offset_x, y+context->offset_y, 1.0f,
-    };
-    struct GraphicsValueSpec uniforms[32] = {
-        {"color",   &color,     GRAPHICS_VALUE_VEC4, 1},
-        {"sprite_uv",  sprite->uv_offset,    GRAPHICS_VALUE_VEC4, 1},
-        {"sprite",  context->data->textures[sprite->texture],    GRAPHICS_VALUE_TEX2, 1},
-    };
-    int num_uniforms = 3;
-    for(int i=0;i<num_uniforms_arg;i++){
-        uniforms[i+num_uniforms] = uniforms_arg[i];
+    struct GameData *data = context->data;
+    struct Font *font = data->fonts + font_id;
+	if (char_index >= font->first_char && char_index <= font->last_char) {
+		struct Sprite *sprite = font->sprites + char_index;
+		if (sprite) {
+			stbtt_aligned_quad quad = { 0 };
+			float fx = 0.f;
+			float fy = 0.f;
+			stbtt_GetBakedQuad(font->baked_chars, font_bitmap_size, font_bitmap_size,
+				char_index, &fx, &fy, &quad, 0);
+			struct RenderCoord offset = { RC_PIXELS, quad.x0 * 0.5f, -quad.y1 * 0.5f };
+			struct RenderCoord offset_zero = { RC_PIXELS,0.f, 0.f };
+			struct RenderCoord pc = cconvert(csubtract(cadd(p, offset, context),offset_zero,context), RC_CANVAS, context);
+			render_sprite_screen_internal(sprite, pc.c[0], pc.c[1], 0.f, sprite->width,
+				*(struct Color*)color,context->data->sprite_shader, 0, 0, context);
+
+			struct RenderCoord offset2 = { RC_PIXELS, fx*0.5f, fy*0.5f};
+			p = csubtract(cadd(p, offset2, context),offset_zero,context);
+		}
+	}
+	return p;
+}
+
+struct RenderCoord render_string_n(const char* string, int n, int font, struct RenderCoord p,
+	float* color, struct RenderContext* context)
+{
+    for(int i=0; i<n; i++){
+        p = render_char(string[i],font,p,color,context);
     }
-    num_uniforms += num_uniforms_arg;
-    render_quad(shader, m, uniforms, num_uniforms, context);
+	return p;
+}
+
+struct RenderCoord render_string(const char* string, int font, struct RenderCoord p,
+	float* color, struct RenderContext* context)
+{
+    int len = (int)strlen(string);
+    return render_string_n(string,len,font,p,color,context);
+
 }
 
 void render_sprite_screen(int sprite,float x, float y,

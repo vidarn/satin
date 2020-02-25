@@ -294,12 +294,23 @@ struct RenderCoord c2s(float x, float y);
 struct RenderCoord c3s(float x, float y, float z);
 struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct RenderContext* context)
 ;
+struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b, struct RenderContext* context)
+;
 struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct RenderContext* context)
 ;
 
+void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
+	float* color, struct RenderContext* context)
+;
 void render_rect(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
 	float *color, struct RenderContext* context)
 ;
 void render_rect_fill(struct RenderCoord p1, struct RenderCoord p2,
 	float *color, struct RenderContext* context)
+;
+struct RenderCoord render_string_n(const char *string, int n, int font, struct RenderCoord p,
+	float *color, struct RenderContext *context)
+;
+struct RenderCoord render_string(const char *string, int font, struct RenderCoord p,
+    float *color, struct RenderContext *context)
 ;
