@@ -314,3 +314,5 @@ struct RenderCoord render_string_n(const char *string, int n, int font, struct R
 struct RenderCoord render_string(const char *string, int font, struct RenderCoord p,
     float *color, struct RenderContext *context)
 ;
+int is_point_in_rect(struct RenderCoord point, struct RenderCoord r1, struct RenderCoord r2, struct RenderContext *context)
+;

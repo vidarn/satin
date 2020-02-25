@@ -382,6 +382,23 @@ struct RenderCoord render_string(const char* string, int font, struct RenderCoor
 
 }
 
+int is_point_in_rect(struct RenderCoord point, struct RenderCoord r1, struct RenderCoord r2, struct RenderContext *context)
+{
+	int type = point.type;
+	r1 = cconvert(r1, type, context);
+	r2 = cconvert(r2, type, context);
+	struct RenderCoord rect_min = { type,
+		r1.c[0] < r2.c[0] ? r1.c[0] : r2.c[0],
+		r1.c[1] < r2.c[1] ? r1.c[1] : r2.c[1],
+	};
+	struct RenderCoord rect_max = { type,
+		r1.c[0] > r2.c[0] ? r1.c[0] : r2.c[0],
+		r1.c[1] > r2.c[1] ? r1.c[1] : r2.c[1],
+	};
+	return point.c[0] > rect_min.c[0] && point.c[0] < rect_max.c[0] &&
+		point.c[1] > rect_min.c[1] && point.c[1] < rect_max.c[1];
+}
+
 void render_sprite_screen(int sprite,float x, float y,
     struct RenderContext *context)
 {
