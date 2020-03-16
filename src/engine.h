@@ -279,6 +279,9 @@ struct RenderCoord {
 	int type;
 	float c[3];
 };
+struct RenderRect {
+	struct RenderCoord p[2];
+};
 
 struct RenderCoord c1p(float x);
 struct RenderCoord c2p(float x, float y);
@@ -299,13 +302,20 @@ struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b, struct 
 struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct RenderContext* context)
 ;
 
+struct RenderRect rectp(float x1, float y1, float x2, float y2);
+struct RenderRect rectw(float x1, float y1, float x2, float y2);
+struct RenderRect rectc(float x1, float y1, float x2, float y2);
+struct RenderRect rect(struct RenderCoord p1, struct RenderCoord p2);
+struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p, struct RenderContext* context)
+;
+
 void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
 	float* color, struct RenderContext* context)
 ;
-void render_rect(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
+void render_rect(struct RenderRect rect, struct RenderCoord thickness,
 	float *color, struct RenderContext* context)
 ;
-void render_rect_fill(struct RenderCoord p1, struct RenderCoord p2,
+void render_rect_fill(struct RenderRect rect,
 	float *color, struct RenderContext* context)
 ;
 struct RenderCoord render_string_n(const char *string, int n, int font, struct RenderCoord p,
@@ -314,5 +324,5 @@ struct RenderCoord render_string_n(const char *string, int n, int font, struct R
 struct RenderCoord render_string(const char *string, int font, struct RenderCoord p,
     float *color, struct RenderContext *context)
 ;
-int is_point_in_rect(struct RenderCoord point, struct RenderCoord r1, struct RenderCoord r2, struct RenderContext *context)
+int is_point_in_rect(struct RenderCoord point, struct RenderRect rect, struct RenderContext *context)
 ;

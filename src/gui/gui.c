@@ -36,6 +36,7 @@ struct GuiContext *gui_init(int font, struct GameData *data)
     struct nk_user_font *nk_font = gui_load_font(font, context, data);
     nk_init_default(ctx, nk_font);
     
+	context->font = font;
     context->rect_shader = load_shader("gui" , "gui_rect" , GRAPHICS_BLEND_MODE_PREMUL,  data);
     context->circle_shader = load_shader("gui" , "gui_circle" , GRAPHICS_BLEND_MODE_PREMUL, data);
     context->triangle_shader = load_shader("gui" , "gui_triangle" , GRAPHICS_BLEND_MODE_PREMUL, data);
@@ -44,7 +45,7 @@ struct GuiContext *gui_init(int font, struct GameData *data)
     return context;
 }
 
-void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, struct GameData *data)
+void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, struct RenderContext *render_context, struct GameData *data)
 {
     struct nk_context *ctx = &gui->ctx;
 
@@ -88,6 +89,9 @@ void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, stru
 	else {
 		unlock_cursor(data);
 	}
+	gui->input = input_state;
+	gui->render_context = render_context;
+	gui->mp = c2c(input_state.mouse_x, input_state.mouse_y);
 
 }
 
@@ -387,4 +391,26 @@ struct Color gui_color_picker(struct Color col, struct GuiContext *gui,
     }
     struct Color ret = {combo_col.r, combo_col.g, combo_col.b, combo_col.a};
     return ret;
+}
+
+
+int gui_button(struct RenderRect button_rect, const char* caption, struct GuiContext* context)
+{
+	int ret = 0;
+	float* col = context->button_col;
+	if (is_point_in_rect(context->mp,button_rect,context->render_context)) {
+		col = context->button_hover_col;
+		if (context->input.mouse_state == MOUSE_CLICKED) {
+			ret = 1;
+		}
+	}
+	render_rect_fill(button_rect, col, context->render_context);
+	render_rect(button_rect, c1p(1.f), context->border_col, context->render_context);
+	if (caption) {
+		//TODO(Vidar):Functions for getting different parts of a rect
+		float button_h = (cconvert(button_rect.p[1], RC_PIXELS, context->render_context).c[1] - cconvert(button_rect.p[0], RC_PIXELS, context->render_context).c[1]);
+		struct RenderCoord text_p = cadd(button_rect.p[0], c2p(10.f, button_h * 0.5f), context->render_context);
+		render_string(caption, context->font, text_p, context->text_col, context->render_context);
+	}
+	return ret;
 }

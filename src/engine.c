@@ -285,6 +285,21 @@ struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct Rend
 	return ret;
 }
 
+struct RenderRect rectp(float x1, float y1, float x2, float y2) { return rect(c2p(x1, y1), c2p(x2, y2)); }
+struct RenderRect rectw(float x1, float y1, float x2, float y2) { return rect(c2w(x1, y1), c2w(x2, y2)); }
+struct RenderRect rectc(float x1, float y1, float x2, float y2) { return rect(c2c(x1, y1), c2c(x2, y2)); }
+struct RenderRect rect(struct RenderCoord p1, struct RenderCoord p2)
+{
+	struct RenderRect rect = { p1, p2 };
+	return rect;
+}
+struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p, struct RenderContext *context)
+{
+	rect.p[0] = cadd(rect.p[0], p, context);
+	rect.p[1] = cadd(rect.p[1], p, context);
+	return rect;
+}
+
 void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
 	float *color, struct RenderContext *context)
 {
@@ -312,21 +327,21 @@ void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoor
     render_quad(context->data->line_shader, m, uniforms, num_uniforms, context);
 }
 
-void render_rect(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
+void render_rect(struct RenderRect rect, struct RenderCoord thickness,
 	float *color, struct RenderContext* context)
 {
-	p1 = cconvert(p1, RC_CANVAS, context);
-	p2 = cconvert(p2, RC_CANVAS, context);
+	struct RenderCoord p1 = cconvert(rect.p[0], RC_CANVAS, context);
+	struct RenderCoord p2 = cconvert(rect.p[1], RC_CANVAS, context);
     render_line(p1, c2c(p1.c[0],p2.c[1]), thickness, color, context);
     render_line(c2c(p2.c[0],p1.c[1]), p2, thickness, color, context);
     render_line(p1, c2c(p2.c[0],p1.c[1]), thickness, color, context);
     render_line(c2c(p1.c[0],p2.c[1]), p2, thickness, color, context);
 }
-void render_rect_fill(struct RenderCoord p1, struct RenderCoord p2,
+void render_rect_fill(struct RenderRect rect,
 	float *color, struct RenderContext* context)
 {
-	struct RenderCoord p1c = cconvert(p1, RC_CANVAS, context);
-	struct RenderCoord p2c = cconvert(p2, RC_CANVAS, context);
+	struct RenderCoord p1c = cconvert(rect.p[0], RC_CANVAS, context);
+	struct RenderCoord p2c = cconvert(rect.p[1], RC_CANVAS, context);
 	struct Matrix3 m = {
 		p2c.c[0] -p1c.c[0], 0, 0.f,
 		0, p2c.c[1] -p1c.c[1], 0.f,
@@ -355,7 +370,12 @@ struct RenderCoord render_char(int char_index, int font_id, struct RenderCoord p
 			struct RenderCoord offset = { RC_PIXELS, quad.x0 * 0.5f, -quad.y1 * 0.5f };
 			struct RenderCoord offset_zero = { RC_PIXELS,0.f, 0.f };
 			struct RenderCoord pc = cconvert(csubtract(cadd(p, offset, context),offset_zero,context), RC_CANVAS, context);
-			render_sprite_screen_internal(sprite, pc.c[0], pc.c[1], 0.f, sprite->width,
+			struct WindowData* window = get_window_data(data);
+			float w, h;
+			window_get_res(&w, &h, window);
+			float s = w > h ? h : w;
+			float width = sprite->width/s*(float)reference_resolution;
+			render_sprite_screen_internal(sprite, pc.c[0], pc.c[1], 0.f, width,
 				*(struct Color*)color,context->data->sprite_shader, 0, 0, context);
 
 			struct RenderCoord offset2 = { RC_PIXELS, fx*0.5f, fy*0.5f};
@@ -382,11 +402,11 @@ struct RenderCoord render_string(const char* string, int font, struct RenderCoor
 
 }
 
-int is_point_in_rect(struct RenderCoord point, struct RenderCoord r1, struct RenderCoord r2, struct RenderContext *context)
+int is_point_in_rect(struct RenderCoord point, struct RenderRect rect, struct RenderContext *context)
 {
 	int type = point.type;
-	r1 = cconvert(r1, type, context);
-	r2 = cconvert(r2, type, context);
+	struct RenderCoord r1 = cconvert(rect.p[0], type, context);
+	struct RenderCoord r2 = cconvert(rect.p[1], type, context);
 	struct RenderCoord rect_min = { type,
 		r1.c[0] < r2.c[0] ? r1.c[0] : r2.c[0],
 		r1.c[1] < r2.c[1] ? r1.c[1] : r2.c[1],
