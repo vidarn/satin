@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 
 set(VLIB_SRC
 	${VLIB_INC_DIR}/sort/sort.c
+	${VLIB_INC_DIR}/memory/buffer.c
 	${VLIB_INC_DIR}/linalg/linalg.c
 )
 project(satin)
