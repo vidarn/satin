@@ -13,8 +13,6 @@ size_t get_file_len(FILE *fp);
 int os_get_num_cores(void)
 ;
 const char *get_computer_name(void);
-int os_is_key_down(int key)
-;
 
 void os_set_clipboard_contents(void* os_data, char* string, size_t len)
 ;

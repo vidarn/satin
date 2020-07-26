@@ -51,10 +51,7 @@ const char *get_computer_name(void)
 {
     return 0;
 }
-int os_is_key_down(int key)
-{
-    return 0;
-}
+
 
 int atomic_increment_int32(int *a)
 {

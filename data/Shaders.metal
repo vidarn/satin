@@ -41,6 +41,25 @@ fragment half4 line_frag(
     return (half4)color;
 }
 
+
+vertex float4 fill_vert(
+    const device packed_float2* points [[ buffer(0) ]],
+    unsigned int vid [[ vertex_id ]],
+    constant packed_float3 *m [[buffer(1)]]
+                        )
+{
+    float3x3 matrix(m[0],m[1],m[2]);
+    return float4( matrix * float3(points[vid], 1.0), 1.0);
+}
+
+
+fragment half4 fill_frag(
+    constant float4 &color [[buffer(2)]]
+    )
+{
+    return (half4)color;
+}
+
 struct SpriteVertexData
 {
     float4 pos[[position]];

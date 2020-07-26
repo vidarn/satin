@@ -250,8 +250,14 @@ struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint3
     
     MTLTextureDescriptor *textureDescriptor = [[MTLTextureDescriptor alloc] init];
 
-    //TODO(Vidar): specify format depending on "format" parameter
-    textureDescriptor.pixelFormat = MTLPixelFormatBGRA8Unorm;
+    //TODO(Vidar): allow for metal native BGRA format
+    //textureDescriptor.pixelFormat = MTLPixelFormatBGRA8Unorm;
+    switch(format){
+        case GRAPHICS_PIXEL_FORMAT_RGBA:
+            textureDescriptor.pixelFormat = MTLPixelFormatRGBA8Unorm;
+            break;
+    }
+    
 
     // Set the pixel dimensions of the texture
     textureDescriptor.width = w;
@@ -280,3 +286,7 @@ void graphics_set_depth_test(int enabled, struct GraphicsData *graphics)
     }
 }
 
+void graphics_set_viewport(int x, int y, int w, int h)
+{
+    
+}

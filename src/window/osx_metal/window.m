@@ -13,6 +13,7 @@ struct GameState *satin_game_states;
 
 //NOTE(Vidar):Ugly way of getting the MTKView from swift to objective-c
 MTKView *satin_mtk_view = 0;
+NSMutableDictionary *keys_down = 0;
 
 struct WindowData{
     struct OSData *os_data;
@@ -61,8 +62,7 @@ void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_
 void satin_update(struct InputState input_state)
 {
     if(g_game_data){
-        update(0,input_state, g_game_data);
-        g_input_state.num_keys_typed = 0;
+        update(TICKS_PER_SECOND/60,input_state, g_game_data);
         float w = satin_mtk_view.drawableSize.width;
         float h = satin_mtk_view.drawableSize.height;
         render((int)w, (int)h, g_game_data);
@@ -71,3 +71,35 @@ void satin_update(struct InputState input_state)
     }
 }
 
+void window_get_extents(float *x_min, float *x_max, float *y_min, float *y_max,
+    struct WindowData *window)
+{
+    float w = satin_mtk_view.drawableSize.width;
+    float h = satin_mtk_view.drawableSize.height;
+    float min_size =(float)(w > h ? h : w);
+    float pad = fabsf((float)(w - h))*0.5f/min_size;
+    *x_min = 0.f;
+    *x_max = 1.f;
+    *y_min = 0.f;
+    *y_max = 1.f;
+    if(w > h){
+        *x_min -= pad;
+        *x_max += pad;
+    }else{
+        *y_min -= pad;
+        *y_max += pad;
+    }
+}
+
+void window_get_res(float* w, float* h, struct WindowData* window)
+{
+    *w = satin_mtk_view.drawableSize.width;
+    *h = satin_mtk_view.drawableSize.height;
+}
+
+int window_is_key_down(int key)
+{
+    //BOOKMARK(Vidar):Check for key in NSDictionary keys_down...
+    NSNumber *value = [keys_down objectForKey:[NSNumber numberWithInt:key]];
+    return value && [value intValue] == 1;
+}

@@ -684,7 +684,8 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     rml->num++;
     
     *(struct Matrix4*)&rm->m = mat;
-    *(struct Matrix4*)&rm->cam = context->camera_3d;
+    *(struct Matrix4*)&render_mesh.view = context->view_3d;
+    *(struct Matrix4*)&render_mesh.proj = context->proj_3d;
     rm->uniforms[0].name = "model_matrix";
     rm->uniforms[0].type = GRAPHICS_VALUE_MAT4;
     rm->uniforms[0].num = 1;
@@ -692,7 +693,7 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     rm->uniforms[1].name = "view_matrix";
     rm->uniforms[1].type = GRAPHICS_VALUE_MAT4;
     rm->uniforms[1].num = 1;
-    rm->uniforms[1].data = rm->cam;
+    rm->uniforms[1].data = rm->view;
 }
 
 float *get_sprite_uv_offset(int sprite, struct GameData *data)
@@ -1100,10 +1101,12 @@ int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct G
 
 void unload_mesh(int mesh, struct GameData* data)
 {
+    /*
     struct Mesh* m = data->meshes + mesh;
     glDeleteBuffers(1, &m->vertex_buffer);
     glDeleteBuffers(1, &m->index_buffer);
     glDeleteVertexArrays(1, &m->vertex_array);
+*/
 }
 
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data)
@@ -1573,12 +1576,12 @@ int load_font_from_fp(FILE *fp, double font_size, struct GameData *data)
 
 int load_font(const char* name, double font_size, struct GameData* data) {
     FILE *fp = open_file(name,"ttf","rb",window_get_os_data(data->window_data));
-	load_font_from_fp(fp, font_size, data);
+	return load_font_from_fp(fp, font_size, data);
 }
 
 int load_font_from_filename(const char* filename, double font_size, struct GameData* data) {
 	FILE* fp = fopen(filename, "rb");
-	load_font_from_fp(fp, font_size, data);
+	return load_font_from_fp(fp, font_size, data);
 }
 
 
@@ -1863,7 +1866,7 @@ int was_key_typed(unsigned int key, struct InputState *input_state)
 }
 
 int is_key_down(int key) {
-	return os_is_key_down(key);
+	return window_is_key_down(key);
 }
 
 float sum_values(float *values, int num)
@@ -1906,8 +1909,6 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     data->window_data = window_data;
     data->graphics = window_get_graphics_data(window_data);
 	data->debug_mode = debug_mode;
-
-	data->fill_shader = load_shader("fill" SATIN_SHADER_SUFFIX, "fill" SATIN_SHADER_SUFFIX , data, "pos", (char*)0);
 
     data->num_game_state_types = num_game_states;
     data->game_state_types = calloc(num_game_states,sizeof(struct GameState));
@@ -2283,7 +2284,7 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
             asp_m.m[10]=1.f;
             asp_m.m[15]=1.f;
             
-            *(struct Matrix4*)&render_mesh->cam = multiply_matrix4(*(struct Matrix4*)&render_mesh->cam,asp_m);
+            *(struct Matrix4*)&render_mesh->proj = multiply_matrix4(*(struct Matrix4*)&render_mesh->proj,asp_m);
             
             
             if (render_mesh->callback) {
