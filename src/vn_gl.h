@@ -33,14 +33,20 @@ static const char *glsl_version_string = "#version 300 es\n";
     //#include <GL/glext.h>
 #endif
 #if defined(__GNUC__)
-	#include "opengl/opengl.h"
-#ifdef __APPLE__
-    static const char *glsl_version_string = "#version 330\n";
+#ifdef EMSCRIPTEN
+    #include <GL/glew.h>
+    #include <GL/glut.h>
 #else
-    static const char *glsl_version_string = "#version 120\n";
-#undef SATIN_SHADER_SUFFIX
-#define SATIN_SHADER_SUFFIX "_120"
+	#include "opengl/opengl.h"
 #endif
+//#ifdef __APPLE__
+    //static const char *glsl_version_string = "#version 330\n";
+    static const char *glsl_version_string = "#version 300 es\n";
+//#else
+    //static const char *glsl_version_string = "#version 120\n";
+//#undef SATIN_SHADER_SUFFIX
+//#define SATIN_SHADER_SUFFIX "_120"
+//#endif
 #endif
 static GLint check_compilation(GLuint handle,GLenum flag,
 	char *error_buffer,size_t error_buffer_len,const char *name)

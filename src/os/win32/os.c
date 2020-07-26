@@ -17,6 +17,7 @@ char os_folder_separator = '\\';
 
 static void set_data_base_path(struct OSData *os_data, WCHAR *data_folder_name)
 {
+
     HMODULE hModule = NULL;
     //HMODULE hModule=GetModuleHandleA(NULL);
 	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
@@ -110,7 +111,7 @@ const char *get_computer_name(void)
 	return buffer;
 }
 
-int get_num_cores(void)
+int os_get_num_cores(void)
 {
 	SYSTEM_INFO system_info = { 0 };
 	GetSystemInfo(&system_info);
@@ -119,6 +120,30 @@ int get_num_cores(void)
 
 int os_is_key_down(int key) {
 	return GetKeyState(key) < 0;
+}
+
+void os_set_clipboard_contents(void* os_data, char* string, size_t len)
+{
+	struct Win32Data* data = os_data;
+	if (!OpenClipboard(data->hWnd)) {
+		return;
+	}
+	EmptyClipboard(); 
+
+	HGLOBAL hglb = GlobalAlloc(GMEM_MOVEABLE, len); 
+	if (hglb == NULL) 
+	{ 
+		CloseClipboard(); 
+		return; 
+	} 
+
+	char *dest = GlobalLock(hglb); 
+	memcpy(dest, string, len); 
+	GlobalUnlock(hglb); 
+
+	SetClipboardData(CF_TEXT, hglb); 
+
+    CloseClipboard(); 
 }
 
 void os_path_strip_leaf(char *path) {
@@ -212,6 +237,22 @@ int os_does_file_exist(const char *filename)
 
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
 		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+int os_does_folder_exist(const char *path)
+{
+	DWORD dwAttrib = GetFileAttributesA(path);
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+int os_make_folder(const char* path)
+{
+	if (!os_does_folder_exist(path)) {
+		return CreateDirectoryA(path, 0);
+	}
+	return 1;
 }
 
 void save_screenshot(const char* filename)

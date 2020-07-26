@@ -10,9 +10,14 @@ FILE *open_file(const char *filename, const char *extension, const char *mode, s
 char *get_save_file_name(const char *title);
 char *get_open_file_name(const char *title);
 size_t get_file_len(FILE *fp);
-int get_num_cores(void);
+int os_get_num_cores(void)
+;
 const char *get_computer_name(void);
-int os_is_key_down(int key);
+int os_is_key_down(int key)
+;
+
+void os_set_clipboard_contents(void* os_data, char* string, size_t len)
+;
 
 extern char os_folder_separator;
 void os_path_strip_leaf(char *path);
@@ -39,4 +44,8 @@ int os_list_entries_in_folder(const char *path, const char **entries, int max_nu
 int os_list_resource_entries(const char* data_path, const char** entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type, struct GameData* data)
 ;
 int os_does_file_exist(const char *filename)
+;
+int os_does_folder_exist(const char *path)
+;
+int os_make_folder(const char* path)
 ;

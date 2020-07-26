@@ -117,18 +117,28 @@ int load_image(const char* name, struct GameData* data)
 int load_image_from_file(const char* filename, struct GameData* data)
 ;
 
+int load_image_from_memory(int sprite_w, int sprite_h,
+	unsigned char* sprite_data, struct GameData* data)
+;
+int load_image(const char *name, struct GameData *data)
+;
+
 int load_sprite_from_memory(int sprite_w, int sprite_h,
     unsigned char *sprite_data, struct GameData *data);
 int load_sprite(const char *name, struct GameData *data);
 int load_sprite_from_filename(const char *filename, struct GameData *data);
 int load_mesh(const char *name, struct GameData *data);
 int load_mesh_unit_plane(int shader, struct GameData *data);
-int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
-    struct Vec3 *normal_data, struct Vec2 *uv_data, int num_faces,
-    int *face_data, int shader, struct GameData *data);
-void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_data,
-	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
-	int *tri_data, int shader, struct GameData *data);
+int load_mesh_from_memory(int num_verts, struct Vec3* pos_data,
+	struct Vec3* normal_data, struct Vec2* uv_data, struct Vec3* tangent_data, int num_tris,
+	int* tri_data, int shader, struct GameData* data)
+;
+void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3* pos_data,
+	struct Vec3* normal_data, struct Vec2* uv_data, struct Vec3* tangent_data, int num_tris,
+	int* tri_data, int shader, struct GameData* data)
+;
+void unload_mesh(int mesh, struct GameData* data)
+;
 void create_sprite_atlas(struct GameData* data)
 ;
 
@@ -137,10 +147,14 @@ int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct G
 ;
 
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data);
-void calculate_mesh_normals(int num_verts, struct Vec3 *pos_data,
-    struct Vec3 *normal_data, int num_tris, int *tri_data);
+void calculate_mesh_normals(int num_verts, struct Vec3* pos_data,
+	struct Vec3* normal_data, int num_tris, int* tri_data)
+;
+void calculate_mesh_tangents(int num_verts, struct Vec3* pos_data,
+	struct Vec2* uv_data, struct Vec3* tangent_data, int num_tris, int* tri_data)
+;
 void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
-    struct Vec3 *normal_data, struct Vec2 *uv_data, struct GameData *data);
+    struct Vec3 *normal_data, struct Vec2 *uv_data, struct Vec2 *tangent_data, struct GameData *data);
 void update_custom_mesh_verts_from_memory(int mesh, int num_data_specs, struct GraphicsValueSpec *data_spec,
                                           struct GameData *data)
 ;
@@ -210,10 +224,10 @@ enum ControllerButtonMask {
 	CONTROLLER_BUTTON_RIGHT_THUMB = 1<<7,
 	CONTROLLER_BUTTON_LEFT_SHOULDER = 1<<8,
 	CONTROLLER_BUTTON_RIGHT_SHOULDER = 1<<9,
-	CONTROLLER_BUTTON_A = 1<<10,
-	CONTROLLER_BUTTON_B = 1<<11,
-	CONTROLLER_BUTTON_X = 1<<12,
-	CONTROLLER_BUTTON_Y = 1<<13,
+	CONTROLLER_BUTTON_A = 1<<12,
+	CONTROLLER_BUTTON_B = 1<<13,
+	CONTROLLER_BUTTON_X = 1<<14,
+	CONTROLLER_BUTTON_Y = 1<<15,
 };
 extern float controller_left_thumb_deadzone;
 extern float controller_right_thumb_deadzone;
@@ -250,7 +264,8 @@ struct RenderContext
     float w,h,offset_x, offset_y;
     struct FrameData *frame_data;
     struct GameData *data;
-    struct Matrix4 camera_3d;
+    struct Matrix4 view_3d;
+    struct Matrix4 proj_3d;
     struct Matrix3 camera_2d;
 	int disable_depth_test;
     enum GraphicsBlendMode blend_mode;

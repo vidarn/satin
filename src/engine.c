@@ -597,15 +597,15 @@ void render_line_screen(float x1, float y1, float x2, float y2, float thickness,
 	float m22 = context->camera_2d.m[4];
 	float scale_x = sqrtf(m11*m11 + m12*m12);
 	float scale_y = sqrtf(m21*m21 + m22*m22);
-    float dx1 = (x2-x1);
-    float dy1 = (y2-y1);
+	float dx1 = (x2 - x1);
+	float dy1 = (y2 - y1);
     float mag = sqrtf(dx1*dx1 + dy1*dy1);
     float dx2 = -dy1/mag*thickness/scale_x;
     float dy2 =  dx1/mag*thickness/scale_y;
     struct Matrix3 m= {
         dx1, dy1, 0.f,
         dx2, dy2, 0.f,
-        x1+context->offset_x, y1+context->offset_y, 1.0f,
+        x1+context->offset_x-dx2/2.f, y1+context->offset_y-dy2/2.f, 1.0f,
     };
     struct GraphicsValueSpec uniforms[] = {
         {"color", &color, GRAPHICS_VALUE_VEC4, 1},
@@ -657,7 +657,8 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     num_uniforms += 2;
 	//render_mesh.scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
     *(struct Matrix4*)&render_mesh.m = mat;
-    *(struct Matrix4*)&render_mesh.cam = context->camera_3d;
+    *(struct Matrix4*)&render_mesh.view = context->view_3d;
+    *(struct Matrix4*)&render_mesh.proj = context->proj_3d;
     render_mesh.num_uniforms = num_uniforms;
     //TODO(Vidar):Can we avoid allocating memory??
     render_mesh.uniforms = calloc(num_uniforms*sizeof(struct GraphicsValueSpec),1);
@@ -994,32 +995,36 @@ int load_mesh_unit_plane(int shader, struct GameData *data)
 		0, 1, 2,
 		3, 2, 1,
 	};
-	return load_mesh_from_memory(4, pos_data, nor_data, uv_data, 2, tri_data, shader, data);
+	return load_mesh_from_memory(4, pos_data, nor_data, uv_data, 0, 2, tri_data, shader, data);
 }
 
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
-	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
+	struct Vec3 *normal_data, struct Vec2 *uv_data, struct Vec3 *tangent_data, int num_tris,
 	int *tri_data, int shader, struct GameData *data)
 {
     int mesh_index = data->num_meshes;
     data->meshes = realloc(data->meshes,(++data->num_meshes)
                            *sizeof(struct Mesh *));
-	update_mesh_from_memory(mesh_index, num_verts, pos_data, normal_data, uv_data, num_tris, tri_data, shader, data);
+	update_mesh_from_memory(mesh_index, num_verts, pos_data, normal_data, uv_data, tangent_data, num_tris, tri_data, shader, data);
     return mesh_index;
 }
 
 void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_data,
-	struct Vec3 *normal_data, struct Vec2 *uv_data, int num_tris,
+	struct Vec3 *normal_data, struct Vec2 *uv_data, struct Vec3 *tangent_data, int num_tris,
 	int *tri_data, int shader, struct GameData *data)
 {
     int vertex_data_len=num_verts*3*sizeof(float);
     int normal_data_len=num_verts*3*sizeof(float);
     int uv_map_data_len=num_verts*2*sizeof(float);
-    float *vertex_data=calloc(vertex_data_len+normal_data_len+uv_map_data_len,1);
+    int tangent_data_len=num_verts*4*sizeof(float);
+    float *vertex_data=calloc(vertex_data_len+normal_data_len+uv_map_data_len+tangent_data_len,1);
     memcpy(vertex_data,pos_data,vertex_data_len);
     memcpy(vertex_data + num_verts*3,normal_data,normal_data_len);
     if(uv_data){
         memcpy(vertex_data + 2*num_verts*3,uv_data,  uv_map_data_len);
+    }
+    if(tangent_data){
+        memcpy(vertex_data + 2*num_verts*3 + num_verts*2,tangent_data,  tangent_data_len);
     }
 
     /*BOOKMARK(Vidar): OpenGL
@@ -1028,15 +1033,13 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
 
     glGenVertexArrays(1,&mesh.vertex_array);
     glBindVertexArray(mesh.vertex_array);
-    glGenBuffers(1,&mesh.vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER,mesh.vertex_buffer);
     
     mesh.num_verts = num_verts;
     
-    glBufferData(GL_ARRAY_BUFFER,vertex_data_len+normal_data_len+uv_map_data_len,vertex_data,
+    glBufferData(GL_ARRAY_BUFFER,vertex_data_len+normal_data_len+uv_map_data_len+tangent_data_len,vertex_data,
                  GL_STATIC_DRAW);
-    //TODO(Vidar):We should be able to free it now, right?
-    //free(vertex_data);
+    free(vertex_data);
     int pos_loc=glGetAttribLocation(mesh.shader->shader,"pos");
     if(pos_loc == -1){
         printf("Error: Could not find \"pos\" attribute in shader\n");
@@ -1061,11 +1064,19 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
         glVertexAttribPointer(uv_map_loc,2,GL_FLOAT,GL_FALSE,
                               0,(void*)(intptr_t)(vertex_data_len+normal_data_len));
     }
+    if(tangent_data){
+        int tangent_loc=glGetAttribLocation(mesh.shader->shader,"tangent");
+        if(tangent_loc == -1){
+            printf("Error: Could not find \"tangent\" attribute in shader\n");
+        }
+        glEnableVertexAttribArray(tangent_loc);
+        glVertexAttribPointer(tangent_loc,4,GL_FLOAT,GL_FALSE,
+                              0,(void*)(intptr_t)(vertex_data_len+normal_data_len+uv_map_data_len));
+    }
     
     mesh.num_tris = num_tris;
     int index_data_len = mesh.num_tris*3*sizeof(int);
 
-    glGenBuffers(1,&mesh.index_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,tri_data,
                  GL_STATIC_DRAW);
@@ -1085,6 +1096,14 @@ int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct G
                            *sizeof(struct Mesh *));
     data->meshes[mesh_index] = mesh;
     return mesh_index;
+}
+
+void unload_mesh(int mesh, struct GameData* data)
+{
+    struct Mesh* m = data->meshes + mesh;
+    glDeleteBuffers(1, &m->vertex_buffer);
+    glDeleteBuffers(1, &m->index_buffer);
+    glDeleteVertexArrays(1, &m->vertex_array);
 }
 
 void save_mesh_to_file(int mesh, const char *name, const char *ext, struct GameData *data)
@@ -1146,8 +1165,52 @@ void calculate_mesh_normals(int num_verts, struct Vec3 *pos_data,
     }
 }
 
+void calculate_mesh_tangents(int num_verts, struct Vec3 *pos_data,
+    struct Vec2 *uv_data, struct Vec3 *tangent_data, int num_tris, int *tri_data)
+{
+	for (int i = 0; i < num_verts; i++) {
+		tangent_data[i] = vec3(0.f, 0.f, 0.f);
+	}
+	for (int i = 0; i < num_tris; i++) {
+		int i1 = tri_data[i * 3 + 0];
+		int i2 = tri_data[i * 3 + 1];
+		int i3 = tri_data[i * 3 + 2];
+		struct Vec3 p1 = pos_data[i1];
+		struct Vec3 p2 = pos_data[i2];
+		struct Vec3 p3 = pos_data[i3];
+		struct Vec3 e1 = sub_vec3(p2, p1);
+		struct Vec3 e2 = sub_vec3(p3, p1);
+		struct Vec2 uv1 = uv_data[i1];
+		struct Vec2 uv2 = uv_data[i2];
+		struct Vec2 uv3 = uv_data[i3];
+		struct Vec2 e1_uv = sub_vec2(uv2, uv1);
+		struct Vec2 e2_uv = sub_vec2(uv3, uv1);
+
+		float m = (e1_uv.y * e2_uv.y - e1_uv.y * e2_uv.x);
+		if (m != 0.f) {
+			float r = 1.f / m;
+			struct Vec3 tangent = scale_vec3(r, sub_vec3(scale_vec3(e2_uv.y, e1), scale_vec3(e1_uv.y, e2)));
+
+			for (int d = 0; d < 3; d++) {
+				tangent_data[i1].m[d] += tangent.m[d];
+				tangent_data[i2].m[d] += tangent.m[d];
+				tangent_data[i3].m[d] += tangent.m[d];
+			}
+		}
+	}
+	for (int i = 0; i < num_verts; i++) {
+		float m = magnitude_vec3(tangent_data[i]);
+		if (m != 0.f) {
+			tangent_data[i] = scale_vec3(1.f / m, tangent_data[i]);
+		}
+		else {
+			tangent_data[i] = vec3(1.f, 0.f, 0.f);
+		};
+	}
+}
+
 void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
-    struct Vec3 *normal_data, struct Vec2 *uv_data, struct GameData *data)
+    struct Vec3 *normal_data, struct Vec2 *uv_data, struct Vec2 *tangent_data, struct GameData *data)
 {
     /*BOOKMARK(Vidar): OpenGL
     struct Mesh m = data->meshes[mesh];
@@ -1156,10 +1219,14 @@ void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
     int vertex_data_len = m.num_verts*sizeof(float)*3;
     int normal_data_len = m.num_verts*sizeof(float)*3;
     int uv_map_data_len = m.num_verts*sizeof(float)*2;
+    int tangent_data_len = m.num_verts*sizeof(float)*2;
     memcpy(buffer, pos_data, vertex_data_len);
     memcpy(buffer+vertex_data_len, normal_data, normal_data_len);
     if(uv_data){
         memcpy(buffer+vertex_data_len+normal_data_len, uv_data, uv_map_data_len);
+    }
+    if(tangent_data){
+        memcpy(buffer+vertex_data_len+normal_data_len+uv_map_data_len, tangent_data, tangent_data_len);
     }
     glUnmapBuffer(GL_ARRAY_BUFFER);
      */
@@ -1291,6 +1358,9 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     s.width        = (float)sprite_w;
     s.inv_aspect   = (float)sprite_h/(float)sprite_w;
 
+	return texture;
+
+	/*
     //TODO(Vidar): double the amount of sprites instead?
     data->sprites = realloc(data->sprites,(data->num_sprites+1)
         *sizeof(struct Sprite));
@@ -1306,7 +1376,7 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     data->num_sprites++;
 
     return data->num_sprites-1;
-    return 0;
+	*/
 }
 
 static int load_image_from_fp(FILE* fp, struct GameData* data)
@@ -1517,9 +1587,9 @@ void create_sprite_atlas(struct GameData *data)
 {
     int pad = 1;
     //printf("Creating atlas\n");
-    //TODO(Vidar):We assume that one 2048x2048 texture is enough for now
-    const int w = 2048;
-    const int h = 2048;
+    //TODO(Vidar):We assume that one 4096x4096 texture is enough for now
+    const int w = 4096;
+    const int h = 4096;
     #define num_nodes 4096
     stbrp_node nodes[num_nodes];
     stbrp_context context;
@@ -1837,6 +1907,8 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
     data->graphics = window_get_graphics_data(window_data);
 	data->debug_mode = debug_mode;
 
+	data->fill_shader = load_shader("fill" SATIN_SHADER_SUFFIX, "fill" SATIN_SHADER_SUFFIX , data, "pos", (char*)0);
+
     data->num_game_state_types = num_game_states;
     data->game_state_types = calloc(num_game_states,sizeof(struct GameState));
 	memcpy(data->game_state_types, game_states, num_game_states * sizeof(struct GameState));
@@ -2020,6 +2092,9 @@ void process_uniforms(int shader, int num_uniforms,
                 case GRAPHICS_VALUE_MAT3:
                     glUniformMatrix3fv(loc,u.num,GL_FALSE,u.data);
                     break;
+                case GRAPHICS_VALUE_MAT2:
+                    glUniformMatrix2fv(loc,u.num,GL_FALSE,u.data);
+                    break;
                 case GRAPHICS_VALUE_VEC4:
                     glUniform4fv(loc,u.num,u.data);
                     break;
@@ -2032,10 +2107,12 @@ void process_uniforms(int shader, int num_uniforms,
                 case GRAPHICS_VALUE_TEX2:
                 {
                     int texture_id = *(int*)u.data;
-                    glUniform1i(loc, num_textures);
-                    glActiveTexture(GL_TEXTURE0 + num_textures);
-                    glBindTexture(GL_TEXTURE_2D, data->texture_ids[texture_id]);
-                    num_textures++;
+					if (texture_id >= 0) {
+						glUniform1i(loc, num_textures);
+						glActiveTexture(GL_TEXTURE0 + num_textures);
+						glBindTexture(GL_TEXTURE_2D, data->texture_ids[texture_id]);
+						num_textures++;
+					}
                     break;
                 }
                 case GRAPHICS_VALUE_SPRITE_POINTER:
@@ -2063,6 +2140,23 @@ void process_uniforms(int shader, int num_uniforms,
                     }else{
                         glUniform4fv(uv_loc,1,sprite->uv_offset);
                     }
+					if(sprite){
+						glUniform1i(loc, num_textures);
+						glActiveTexture(GL_TEXTURE0 + num_textures);
+						glBindTexture(GL_TEXTURE_2D,
+							data->texture_ids[sprite->texture]);
+						num_textures++;
+						size_t len = strlen(u.name) + 4;
+						char *buffer = alloca(len);
+						sprintf(buffer, "%s_uv", u.name);
+						int uv_loc=glGetUniformLocation(shader,buffer);
+						if(uv_loc == -1){
+							printf("Error: Could not find \"%s\" uniform in shader\n",
+								buffer);
+						}else{
+							glUniform4fv(uv_loc,1,sprite->uv_offset);
+						}
+					}
                     break;
                 }
             }
@@ -2127,7 +2221,8 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
             int loc_model=glGetUniformLocation(shader,"model_matrix");
             int loc_view=glGetUniformLocation(shader,"view_matrix");
-            if(loc_model == -1 || loc_view == -1){
+            int loc_proj=glGetUniformLocation(shader,"proj_matrix");
+            if(loc_model == -1 || loc_view == -1 || loc_proj == -1){
                 if(loc_model == -1){
                     printf("Error: Could not find \"%s\" uniform in shader\n",
                            "model_matrix");
@@ -2135,6 +2230,10 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
                 if(loc_view == -1){
                     printf("Error: Could not find \"%s\" uniform in shader\n",
                        "view_matrix");
+                }
+                if(loc_proj == -1){
+                    printf("Error: Could not find \"%s\" uniform in shader\n",
+                       "proj_matrix");
                 }
             }else{
                 struct Matrix4 asp_m={0};
@@ -2147,10 +2246,11 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
                 }
                 asp_m.m[10]=1.f;
                 asp_m.m[15]=1.f;
-                struct Matrix4 view_m =
-                    multiply_matrix4(*(struct Matrix4*)&render_mesh->cam,asp_m);
+				struct Matrix4 view_m = *(struct Matrix4*) & render_mesh->view;
+				struct Matrix4 proj_m = multiply_matrix4(*(struct Matrix4*)&render_mesh->proj,asp_m);
                 struct Matrix4 model_m = *(struct Matrix4*)&render_mesh->m;
                 glUniformMatrix4fv(loc_view,1,GL_FALSE,(float*)&view_m.m[0]);
+                glUniformMatrix4fv(loc_proj,1,GL_FALSE,(float*)&proj_m.m[0]);
                 glUniformMatrix4fv(loc_model,1,GL_FALSE,(float*)&model_m.m[0]);
             }
             process_uniforms(shader, render_mesh->num_uniforms,
