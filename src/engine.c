@@ -214,6 +214,15 @@ struct RenderCoord c3c(float x, float y, float z) { struct RenderCoord rc = { RC
 struct RenderCoord c1s(float x) { struct RenderCoord rc = { RC_SCALE,x,0 }; return rc; }
 struct RenderCoord c2s(float x, float y) { struct RenderCoord rc = { RC_SCALE,x,y,0 }; return rc; }
 struct RenderCoord c3s(float x, float y, float z) { struct RenderCoord rc = { RC_SCALE,x,y,z }; return rc; }
+
+struct RenderCoord cscale(struct RenderCoord a, float s)
+{
+    a.c[0] *= s;
+    a.c[1] *= s;
+    a.c[2] *= s;
+    return a;
+}
+
 struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct RenderContext *context)
 {
     b = cconvert(b, a.type, context);
@@ -419,10 +428,18 @@ int is_point_in_rect(struct RenderCoord point, struct RenderRect rect, struct Re
 		point.c[1] > rect_min.c[1] && point.c[1] < rect_max.c[1];
 }
 
+struct Matrix3 get_rect_matrix3(struct RenderRect rect, struct RenderContext *context)
+{
+    struct RenderCoord c1 = cconvert(rect.p[0], RC_CANVAS, context);
+    struct RenderCoord c2 = cconvert(rect.p[1], RC_CANVAS, context);
+    struct Matrix3 m = multiply_matrix3(get_scale_matrix3_non_uniform(c2.c[0]-c1.c[0], c2.c[1]-c1.c[1]), get_translation_matrix3(c1.c[0], c1.c[1]));
+    return m;
+}
+
 void render_sprite_screen(int sprite,float x, float y,
     struct RenderContext *context)
 {
-    struct Color color = {1.f, 1.f, 1.f, 1.f};
+    struct Color color = context->sprite_color;
     render_sprite_screen_internal(context->data->sprites + sprite,x,y,0.f,
         context->data->sprites[sprite].width,
         color,context->data->sprite_shader, 0, 0, context);
@@ -431,7 +448,7 @@ void render_sprite_screen(int sprite,float x, float y,
 void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
     struct RenderContext *context)
 {
-    struct Color color = {1.f, 1.f, 1.f, 1.f};
+    struct Color color = context->sprite_color;
     float width = context->data->sprites[sprite].width *scale;
     render_sprite_screen_internal(context->data->sprites + sprite,x,y,1.f,width,
         color,context->data->sprite_shader, 0, 0,context);

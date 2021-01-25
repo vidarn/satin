@@ -262,6 +262,7 @@ struct InputState
 struct RenderContext
 {
     float w,h,offset_x, offset_y;
+    struct Color sprite_color;
     struct FrameData *frame_data;
     struct GameData *data;
     struct Matrix4 view_3d;
@@ -310,6 +311,8 @@ struct RenderCoord c3c(float x, float y, float z);
 struct RenderCoord c1s(float x);
 struct RenderCoord c2s(float x, float y);
 struct RenderCoord c3s(float x, float y, float z);
+struct RenderCoord cscale(struct RenderCoord a, float s)
+;
 struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct RenderContext* context)
 ;
 struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b, struct RenderContext* context)
@@ -340,4 +343,6 @@ struct RenderCoord render_string(const char *string, int font, struct RenderCoor
     float *color, struct RenderContext *context)
 ;
 int is_point_in_rect(struct RenderCoord point, struct RenderRect rect, struct RenderContext *context)
+;
+struct Matrix3 get_rect_matrix3(struct RenderRect rect, struct RenderContext *context)
 ;
