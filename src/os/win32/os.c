@@ -124,9 +124,7 @@ int os_is_key_down(int key) {
 
 void os_set_clipboard_contents(void* os_data, char* string, size_t len)
 {
-	//TODO: Move to window.c
-	/*
-	struct OSData* data = os_data;
+	struct Win32Data* data = os_data;
 	if (!OpenClipboard(data->hWnd)) {
 		return;
 	}
@@ -146,7 +144,6 @@ void os_set_clipboard_contents(void* os_data, char* string, size_t len)
 	SetClipboardData(CF_TEXT, hglb); 
 
     CloseClipboard(); 
-	*/
 }
 
 void os_path_strip_leaf(char *path) {

@@ -26,6 +26,5 @@ void window_get_extents(float *x_min, float *x_max, float *y_min, float *y_max,
 
 void window_get_res(float *w, float *h, struct WindowData *window)
 ;
-
 int window_is_key_down(int key)
 ;

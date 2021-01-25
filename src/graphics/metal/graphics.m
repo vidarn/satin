@@ -83,14 +83,6 @@ void graphics_begin_render_pass(float *clear_rgba, struct GraphicsData *graphics
         clear_rgba[2], clear_rgba[3])];
     graphics->command_encoder = [graphics->command_buffer renderCommandEncoderWithDescriptor:graphics->pass_descriptor];
     [graphics->command_encoder setDepthStencilState:graphics->depth_testing_off];
-   /*
-    let commandBuffer = commandQueue.makeCommandBuffer()!
-    if let renderPassDescriptor = view.currentRenderPassDescriptor, let drawable = view.currentDrawable {
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(1.0, 0, 1.0, 0)
-        let commandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
-        */
-        
-
 }
 
 void graphics_end_render_pass(struct GraphicsData *graphics)
@@ -98,12 +90,6 @@ void graphics_end_render_pass(struct GraphicsData *graphics)
     [graphics->command_encoder endEncoding];
     [graphics->command_buffer presentDrawable:[graphics->view currentDrawable] ];
     [graphics->command_buffer commit];
-        /*
-        commandEncoder.endEncoding()
-        commandBuffer.present(drawable)
-        commandBuffer.commit()
-    }
-         */
 }
 
 void graphics_clear(struct GraphicsData *graphics)
@@ -188,19 +174,6 @@ struct Shader *graphics_compile_shader(const char *vert_filename, const char *fr
          ];
     }
     
-    /*
-    let defaultLibrary = device.makeDefaultLibrary()!
-    let fragmentProgram = defaultLibrary.makeFunction(name: "basic_fragment")
-    let vertexProgram = defaultLibrary.makeFunction(name: "basic_vertex")
-     
-     let pipelineStateDescriptor = MTLRenderPipelineDescriptor()
-     pipelineStateDescriptor.vertexFunction = vertexProgram
-     pipelineStateDescriptor.fragmentFunction = fragmentProgram
-     pipelineStateDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-     
-     // 3
-     pipelineState = try! device.makeRenderPipelineState(descriptor: pipelineStateDescriptor)
-     */
     return shader;
 }
 
@@ -276,6 +249,19 @@ struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint3
     return tex;
 }
 
+
+void graphics_update_texture(struct Texture *tex, uint8_t *texture_data,
+    uint32_t x, uint32_t y, uint32_t w, uint32_t h, struct GraphicsData *graphics)
+{
+    uint64_t tex_w = [tex->texture width];
+    MTLRegion region = {
+        { x, y, 0 },// MTLOrigin
+        {w, h, 1}   // MTLSize
+    };
+    
+    [tex->texture replaceRegion:region mipmapLevel:0 withBytes:texture_data
+                    bytesPerRow:4*w];
+}
 
 void graphics_set_depth_test(int enabled, struct GraphicsData *graphics)
 {

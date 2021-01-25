@@ -578,8 +578,3 @@ void window_get_res(float* w, float* h, struct WindowData* window)
 	*w = (float)window->framebuffer_w;
 	*h = (float)window->framebuffer_h;
 }
-
-int window_is_key_down(int key)
-{
-	return 0;
-}

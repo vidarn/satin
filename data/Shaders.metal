@@ -107,14 +107,16 @@ vertex struct MeshVertexData mesh_vert(
     const device packed_float3* uv [[ buffer(2) ]],
     unsigned int vid [[ vertex_id ]],
     constant packed_float4 *model_m [[buffer(3)]],
-    constant packed_float4 *view_m [[buffer(4)]]
+    constant packed_float4 *view_m [[buffer(4)]],
+    constant packed_float4 *proj_m [[buffer(5)]]
     )
 {
     float4x4 model_matrix(model_m[0],model_m[1],model_m[2],model_m[3]);
     float4x4 view_matrix(view_m[0],view_m[1],view_m[2],view_m[3]);
+    float4x4 proj_matrix(proj_m[0],proj_m[1],proj_m[2],proj_m[3]);
     struct MeshVertexData out;
     float3 p = pos[vid];
-    out.pos  =  view_matrix * model_matrix * float4(p, 1.0);
+    out.pos  =  proj_matrix * view_matrix * model_matrix * float4(p, 1.0);
     //NOTE(Vidar):Assume that the model matrix is orthogonal (no non-uniform scaling)
     out.normal = float3(model_matrix * float4(normal[vid], 0.f));
     return out;
@@ -137,6 +139,12 @@ fragment half4 mesh_frag(
     return half4(float4(in.normal, 1.f));
 }
 
+fragment half4 mesh_debug_frag(
+    struct MeshVertexData in [[stage_in]]
+    )
+{
+    return half4(float4(in.normal*.5f +float3(0.5f), 1.f));
+}
 
 struct SpriteMeshVertexData
 {

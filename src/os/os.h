@@ -39,7 +39,7 @@ enum OS_LIST_ENTRIES_TYPE {
 //NOTE(Vidar): You have to free the strings returned in entries
 int os_list_entries_in_folder(const char *path, const char **entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type)
 ;
-int os_list_resource_entries(const char *data_path, const char** entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type, struct OSData *os_data)
+int os_list_resource_entries(const char* data_path, const char** entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type, struct GameData* data)
 ;
 int os_does_file_exist(const char *filename)
 ;

@@ -6,5 +6,5 @@ uniform sampler2D sprite;
 uniform vec4 sprite_uv;
 void main()
 {
-    col = texture(sprite, uv*sprite_uv.zw + sprite_uv.xy);
+    col = texture(sprite, uv*sprite_uv.zw + sprite_uv.xy)*color;
 }

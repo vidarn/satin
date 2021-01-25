@@ -127,6 +127,14 @@ int load_sprite_from_memory(int sprite_w, int sprite_h,
     unsigned char *sprite_data, struct GameData *data);
 int load_sprite(const char *name, struct GameData *data);
 int load_sprite_from_filename(const char *filename, struct GameData *data);
+// The returned pointer contains all of the mesh data. You are responsible for freeing it
+// If the return value is null the loading failed.
+void *load_mesh_to_memory(const char *name,
+                        int *num_verts_out, float **vertex_data_out,
+                        float **normal_data_out, float **uv_map_data_out,
+                        int *num_tris_out, int **index_data_out,
+                          struct GameData *data)
+;
 int load_mesh(const char *name, struct GameData *data);
 int load_mesh_unit_plane(int shader, struct GameData *data);
 int load_mesh_from_memory(int num_verts, struct Vec3* pos_data,
@@ -262,7 +270,6 @@ struct InputState
 struct RenderContext
 {
     float w,h,offset_x, offset_y;
-    struct Color sprite_color;
     struct FrameData *frame_data;
     struct GameData *data;
     struct Matrix4 view_3d;

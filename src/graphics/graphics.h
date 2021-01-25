@@ -10,6 +10,8 @@ struct Mesh
 ;
 struct Texture
 ;
+struct RenderPass
+;
 
 //TODO(Vidar):struct that is Mesh + Shader???
 
@@ -80,7 +82,6 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
 
 struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint32_t h, uint32_t format, struct GraphicsData *graphics)
 ;
-
 void graphics_update_texture(struct Texture *tex, uint8_t *texture_data,
     uint32_t x, uint32_t y, uint32_t w, uint32_t h, struct GraphicsData *graphics)
 ;

@@ -439,7 +439,7 @@ struct Matrix3 get_rect_matrix3(struct RenderRect rect, struct RenderContext *co
 void render_sprite_screen(int sprite,float x, float y,
     struct RenderContext *context)
 {
-    struct Color color = context->sprite_color;
+    struct Color color = {1.f, 1.f, 1.f, 1.f};
     render_sprite_screen_internal(context->data->sprites + sprite,x,y,0.f,
         context->data->sprites[sprite].width,
         color,context->data->sprite_shader, 0, 0, context);
@@ -448,7 +448,7 @@ void render_sprite_screen(int sprite,float x, float y,
 void render_sprite_screen_scaled(int sprite,float x, float y, float scale,
     struct RenderContext *context)
 {
-    struct Color color = context->sprite_color;
+    struct Color color = {1.f, 1.f, 1.f, 1.f};
     float width = context->data->sprites[sprite].width *scale;
     render_sprite_screen_internal(context->data->sprites + sprite,x,y,1.f,width,
         color,context->data->sprite_shader, 0, 0,context);
@@ -671,7 +671,7 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
 	render_mesh.depth_test = !context->disable_depth_test;
     render_mesh.mesh = mesh;
     render_mesh.shader = shader;
-    num_uniforms += 2;
+    num_uniforms += 3;
 	//render_mesh.scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
     *(struct Matrix4*)&render_mesh.m = mat;
     *(struct Matrix4*)&render_mesh.view = context->view_3d;
@@ -679,7 +679,7 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     render_mesh.num_uniforms = num_uniforms;
     //TODO(Vidar):Can we avoid allocating memory??
     render_mesh.uniforms = calloc(num_uniforms*sizeof(struct GraphicsValueSpec),1);
-    for(int i=0;i<num_uniforms-2;i++){
+    for(int i=0;i<num_uniforms-3;i++){
         enum GraphicsValueType type = uniforms[i].type;
         int size = graphics_value_sizes[type]*uniforms[i].num;
         render_mesh.uniforms[i+2].name = strdup(uniforms[i].name);
@@ -711,6 +711,10 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     rm->uniforms[1].type = GRAPHICS_VALUE_MAT4;
     rm->uniforms[1].num = 1;
     rm->uniforms[1].data = rm->view;
+    rm->uniforms[2].name = "projection_matrix";
+    rm->uniforms[2].type = GRAPHICS_VALUE_MAT4;
+    rm->uniforms[2].num = 1;
+    rm->uniforms[2].data = rm->proj;
 }
 
 float *get_sprite_uv_offset(int sprite, struct GameData *data)
@@ -798,9 +802,14 @@ static int compare_tinyobj_vert_index(void *a, void*b, void *data)
     }
 }
 
-int load_mesh(const char *name, struct GameData *data)
+// The returned pointer contains all of the mesh data. You are responsible for freeing it
+// If the return value is null the loading failed.
+void *load_mesh_to_memory(const char *name,
+                        int *num_verts_out, float **vertex_data_out,
+                        float **normal_data_out, float **uv_map_data_out,
+                        int *num_tris_out, int **index_data_out,
+                          struct GameData *data)
 {
-    //TODO(Vidar):Don't use obj!!
     FILE *fp=open_file(name,"obj","rb", window_get_os_data(data->window_data));
     if(fp){
         fseek(fp,0,SEEK_END);
@@ -846,14 +855,21 @@ int load_mesh(const char *name, struct GameData *data)
         printf("%d unique verts\n", num_unique_verts);
         // Use the sorted indices to assign the correct verts to faces
         int *vert_to_unique_vert = calloc(attrib.num_face_num_verts*3, sizeof(int));
+        
+        int num_tris = attrib.num_face_num_verts;
+        int index_data_len = num_tris*3*sizeof(int);
 
         int num_verts = num_unique_verts;
         int vertex_data_len=num_verts*3*sizeof(float);
         int normal_data_len=num_verts*3*sizeof(float);
         int uv_map_data_len=num_verts*2*sizeof(float);
-        float *vertex_data=calloc(vertex_data_len+normal_data_len+uv_map_data_len,1);
+        
+        void *data_buffer = calloc(vertex_data_len+normal_data_len+uv_map_data_len+index_data_len,1);
+        
+        float *vertex_data = data_buffer;
         float *normal_data = vertex_data + num_verts*3;
         float *uv_map_data = normal_data + num_verts*3;
+        int *index_data= (int*)(uv_map_data + num_verts*2);
         unsigned int face_i = 0;
         int no_normals = 1;
         for(int i=0;i<num_verts;i++){
@@ -886,9 +902,6 @@ int load_mesh(const char *name, struct GameData *data)
             }
         }
         
-        int num_tris = attrib.num_face_num_verts;
-        int index_data_len = num_tris*3*sizeof(int);
-        int *index_data=calloc(index_data_len,1);
         for(int i=0;i<num_tris*3;i++){
             index_data[i] = vert_to_unique_vert[i];
         }
@@ -903,6 +916,28 @@ int load_mesh(const char *name, struct GameData *data)
             calculate_mesh_normals(num_verts, vertex_data, normal_data, num_tris, index_data);
         }
         
+        *num_verts_out = num_verts;
+        *vertex_data_out = vertex_data;
+        *normal_data_out = normal_data;
+        *uv_map_data_out = uv_map_data;
+        *num_tris_out = num_tris;
+        *index_data_out = index_data;
+        
+        return data_buffer;
+    }
+    return 0;
+}
+
+int load_mesh(const char *name, struct GameData *data)
+{
+    //TODO(Vidar):Don't use obj!!
+    int num_verts, num_tris;
+    float *vertex_data, *normal_data, *uv_map_data;
+    int *index_data;
+    void * mesh_data = load_mesh_to_memory(name, &num_verts, &vertex_data,
+                                           &normal_data, &uv_map_data, &num_tris,
+                                           &index_data, data);
+    if(mesh_data){
         struct GraphicsValueSpec data_specs[] = {
             {"pos", (uint8_t *)vertex_data, GRAPHICS_VALUE_VEC3},
             {"normal", (uint8_t *)normal_data, GRAPHICS_VALUE_VEC3},
@@ -913,66 +948,9 @@ int load_mesh(const char *name, struct GameData *data)
         int ret =  load_custom_mesh_from_memory(num_verts, num_tris, index_data,
             num_data_specs, data_specs, data);
         
-        free(index_data);
-        free(vertex_data);
+        free(mesh_data);
         
         return ret;
-        
-        /* BOOKMARK(Vidar): OpenGL
-        mesh.num_tris = attrib.num_face_num_verts;
-        int index_data_len = mesh.num_tris*3*sizeof(int);
-        unsigned int *index_data=calloc(index_data_len,1);
-        for(int i=0;i<mesh.num_tris*3;i++){
-            index_data[i] = vert_to_unique_vert[i];
-        }
-
-        free(faces);
-        free(faces_tmp);
-        free(idx);
-        free(idx_tmp);
-        
-        mesh.num_verts = num_verts;
-
-        
-        mesh.shader=data->shaders+shader;
-        glGenVertexArrays(1,&mesh.vertex_array);
-        glBindVertexArray(mesh.vertex_array);
-        glGenBuffers(1,&mesh.vertex_buffer);
-        glBindBuffer(GL_ARRAY_BUFFER,mesh.vertex_buffer);
-        glBufferData(GL_ARRAY_BUFFER,vertex_data_len+normal_data_len+uv_map_data_len,vertex_data,
-            GL_STATIC_DRAW);
-        //TODO(Vidar):We should be able to free it now, right?
-        //free(vertex_data);
-        int pos_loc=glGetAttribLocation(mesh.shader->shader,"pos");
-        if(pos_loc == -1){
-            printf("Error: Could not find \"pos\" attribute in shader\n");
-        }
-        glEnableVertexAttribArray(pos_loc);
-        glVertexAttribPointer(pos_loc,3,GL_FLOAT,GL_FALSE,
-            0,(void*)0);
-        
-        int normal_loc=glGetAttribLocation(mesh.shader->shader,"normal");
-        if(normal_loc == -1){
-            printf("Error: Could not find \"normal\" attribute in shader\n");
-        }
-        glEnableVertexAttribArray(normal_loc);
-        glVertexAttribPointer(normal_loc,3,GL_FLOAT,GL_FALSE,
-            0,(void*)(intptr_t)vertex_data_len);
-        
-        int uv_map_loc=glGetAttribLocation(mesh.shader->shader,"uv_map");
-        if(uv_map_loc == -1){
-            printf("Error: Could not find \"uv_map\" attribute in shader\n");
-        }
-        glEnableVertexAttribArray(uv_map_loc);
-        glVertexAttribPointer(uv_map_loc,2,GL_FLOAT,GL_FALSE,
-                              0,(void*)(intptr_t)(vertex_data_len+normal_data_len));
-
-
-        glGenBuffers(1,&mesh.index_buffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.index_buffer);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data_len,index_data,
-            GL_STATIC_DRAW);
-*/
     } else{
         printf("Could not load mesh \"%s\"\n",name);
     }
@@ -1020,11 +998,17 @@ int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
 	struct Vec3 *normal_data, struct Vec2 *uv_data, struct Vec3 *tangent_data, int num_tris,
 	int *tri_data, int shader, struct GameData *data)
 {
-    int mesh_index = data->num_meshes;
-    data->meshes = realloc(data->meshes,(++data->num_meshes)
-                           *sizeof(struct Mesh *));
-	update_mesh_from_memory(mesh_index, num_verts, pos_data, normal_data, uv_data, tangent_data, num_tris, tri_data, shader, data);
-    return mesh_index;
+    struct GraphicsValueSpec data_specs[] = {
+        {"pos", (uint8_t *)pos_data, GRAPHICS_VALUE_VEC3},
+        {"normal", (uint8_t *)normal_data, GRAPHICS_VALUE_VEC3},
+        {"uv", (uint8_t *)uv_data, GRAPHICS_VALUE_VEC2}
+    };
+    int num_data_specs = sizeof(data_specs)/sizeof(*data_specs);
+    
+    int ret =  load_custom_mesh_from_memory(num_verts, num_tris, tri_data,
+        num_data_specs, data_specs, data);
+    
+    return ret;
 }
 
 void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_data,
@@ -1106,7 +1090,6 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
 int load_custom_mesh_from_memory(int num_verts, int num_tris,
 int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct GameData *data)
 {
-    //BOOKMARK(Vidar):implement mesh creation
     struct Mesh *mesh = graphics_create_mesh(data_spec, num_data_specs, num_verts, tri_data, num_tris*3, data->graphics);
 
     int mesh_index = data->num_meshes;
@@ -1427,6 +1410,8 @@ void update_sprite_from_memory(int sprite, unsigned char *sprite_data,
     //TODO(Vidar):Update padding as well...
     struct Sprite *s = data->sprites + sprite;
     struct SpriteData *sd = data->sprite_data + sprite;
+    graphics_update_texture(data->textures[s->texture], sprite_data, sd->x,
+        sd->y, sd->w, sd->h, window_get_graphics_data(data->window_data));
     /*BOOKMARK(Vidar): OpenGL
     glBindTexture(GL_TEXTURE_2D, data->texture_ids[s->texture]);
     glTexSubImage2D(GL_TEXTURE_2D, 0, sd->x, sd->y, sd->w, sd->h, GL_RGBA,
@@ -1758,9 +1743,9 @@ void frame_data_reset(struct FrameData *frame_data)
         while(rml != 0){
             for(int i=0;i<rml->num;i++){
                 struct RenderMesh *rm = rml->meshes + i;
-                //NOTE(Vidar):The first two uniforms are the view and model matrices, don't
+                //NOTE(Vidar):The first three uniforms are the view, model and projection matrices, don't
                 // try to free them!
-                for(int i=2;i<rm->num_uniforms;i++){
+                for(int i=4;i<rm->num_uniforms;i++){
                     free(rm->uniforms[i].name);
                     free(rm->uniforms[i].data);
                 }
