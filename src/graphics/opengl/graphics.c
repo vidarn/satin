@@ -45,6 +45,7 @@ struct Mesh
 struct Texture
 {
     unsigned int handle;
+	GLenum gl_format;
 };
 
 int graphics_value_sizes[] = {
@@ -353,10 +354,18 @@ struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint3
 		gl_format = GL_RGBA;
 		break;
 	}
+    texture->gl_format = gl_format;
     glTexImage2D(GL_TEXTURE_2D, 0,gl_format, w, h,
         0, gl_format, GL_UNSIGNED_BYTE, texture_data);
     printf("Loaded texture!\n");
     return texture;
+}
+
+void graphics_update_texture(struct Texture* tex, uint8_t* texture_data,
+    uint32_t x, uint32_t y, uint32_t w, uint32_t h, struct GraphicsData* graphics)
+{
+    glBindTexture(GL_TEXTURE_2D, tex->handle);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, tex->gl_format , GL_UNSIGNED_BYTE , texture_data);
 }
 
 void graphics_set_depth_test(int enabled, struct GraphicsData *graphics)

@@ -124,11 +124,14 @@ int os_is_key_down(int key) {
 
 void os_set_clipboard_contents(void* os_data, char* string, size_t len)
 {
+	//TODO: Move to window.c
+	/*
 	struct Win32Data* data = os_data;
 	if (!OpenClipboard(data->hWnd)) {
 		return;
 	}
 	EmptyClipboard(); 
+
 
 	HGLOBAL hglb = GlobalAlloc(GMEM_MOVEABLE, len); 
 	if (hglb == NULL) 
@@ -144,6 +147,7 @@ void os_set_clipboard_contents(void* os_data, char* string, size_t len)
 	SetClipboardData(CF_TEXT, hglb); 
 
     CloseClipboard(); 
+	*/
 }
 
 void os_path_strip_leaf(char *path) {
