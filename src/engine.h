@@ -77,6 +77,10 @@ void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniform
     int num_uniforms, struct RenderContext *context)
 ;
 
+void render_sprite_rect(int sprite, struct RenderRect rect,
+    struct RenderContext* context)
+;
+
 void render_sprite_screen(int sprite,float x, float y,
     struct RenderContext *context)
 ;
