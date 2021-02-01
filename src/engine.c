@@ -436,6 +436,27 @@ struct Matrix3 get_rect_matrix3(struct RenderRect rect, struct RenderContext *co
     return m;
 }
 
+void render_sprite_rect(int sprite, struct RenderRect rect,
+    struct RenderContext *context)
+{
+	struct RenderCoord p1c = cconvert(rect.p[0], RC_CANVAS, context);
+	struct RenderCoord p2c = cconvert(rect.p[1], RC_CANVAS, context);
+	struct Matrix3 m = {
+		p2c.c[0] -p1c.c[0], 0, 0.f,
+		0, p2c.c[1] -p1c.c[1], 0.f,
+		p1c.c[0], p1c.c[1], 1.0f,
+	};
+    struct Color color = {1.f, 1.f, 1.f, 1.f};
+    struct Sprite* s = context->data->sprites + sprite;
+    struct GraphicsValueSpec uniforms[32] = {
+        {"color",   &color,     GRAPHICS_VALUE_VEC4, 1},
+        {"sprite_uv",  s->uv_offset,    GRAPHICS_VALUE_VEC4, 1},
+        {"sprite",  context->data->textures[s->texture],    GRAPHICS_VALUE_TEX2, 1},
+    };
+    int num_uniforms = 3;
+    render_quad(context->data->sprite_shader, m, uniforms, num_uniforms, context);
+}
+
 void render_sprite_screen(int sprite,float x, float y,
     struct RenderContext *context)
 {
