@@ -104,7 +104,7 @@ void graphics_clear(struct GraphicsData *graphics)
             graphics->clear_color[2],
             graphics->clear_color[3]
             );
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
 void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader,
@@ -330,7 +330,6 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,num_indices*4,index_data,
                  GL_STATIC_DRAW);
-    printf("Mesh created!\n");
 
     return mesh;
 }
@@ -370,5 +369,11 @@ void graphics_update_texture(struct Texture* tex, uint8_t* texture_data,
 
 void graphics_set_depth_test(int enabled, struct GraphicsData *graphics)
 {
+    if (enabled) {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+    } else {
+        glDisable(GL_DEPTH_TEST);
+    }
 }
 

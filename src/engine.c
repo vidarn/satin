@@ -703,11 +703,11 @@ void render_mesh_with_callback(int mesh, int shader, struct Matrix4 mat, struct 
     for(int i=0;i<num_uniforms-3;i++){
         enum GraphicsValueType type = uniforms[i].type;
         int size = graphics_value_sizes[type]*uniforms[i].num;
-        render_mesh.uniforms[i+2].name = strdup(uniforms[i].name);
-        render_mesh.uniforms[i+2].type = type;
-        render_mesh.uniforms[i+2].num = uniforms[i].num;
-        render_mesh.uniforms[i+2].data = calloc(1,size);
-        memcpy(render_mesh.uniforms[i+2].data, uniforms[i].data, size);
+        render_mesh.uniforms[i+3].name = strdup(uniforms[i].name);
+        render_mesh.uniforms[i+3].type = type;
+        render_mesh.uniforms[i+3].num = uniforms[i].num;
+        render_mesh.uniforms[i+3].data = calloc(1,size);
+        memcpy(render_mesh.uniforms[i+3].data, uniforms[i].data, size);
     }
     
     struct RenderMeshList * rml = &context->frame_data->render_mesh_list;
@@ -1016,13 +1016,14 @@ int load_mesh_unit_plane(int shader, struct GameData *data)
 }
 
 int load_mesh_from_memory(int num_verts, struct Vec3 *pos_data,
-	struct Vec3 *normal_data, struct Vec2 *uv_data, struct Vec3 *tangent_data, int num_tris,
+	struct Vec3 *normal_data, struct Vec2 *uv_data, float *tangent_data, int num_tris,
 	int *tri_data, int shader, struct GameData *data)
 {
     struct GraphicsValueSpec data_specs[] = {
         {"pos", (uint8_t *)pos_data, GRAPHICS_VALUE_VEC3},
         {"normal", (uint8_t *)normal_data, GRAPHICS_VALUE_VEC3},
-        {"uv", (uint8_t *)uv_data, GRAPHICS_VALUE_VEC2}
+        {"uv_map", (uint8_t *)uv_data, GRAPHICS_VALUE_VEC2},
+        {"tangent", (uint8_t *)tangent_data, GRAPHICS_VALUE_VEC4}
     };
     int num_data_specs = sizeof(data_specs)/sizeof(*data_specs);
     

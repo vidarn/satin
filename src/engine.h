@@ -142,7 +142,7 @@ void *load_mesh_to_memory(const char *name,
 int load_mesh(const char *name, struct GameData *data);
 int load_mesh_unit_plane(int shader, struct GameData *data);
 int load_mesh_from_memory(int num_verts, struct Vec3* pos_data,
-	struct Vec3* normal_data, struct Vec2* uv_data, struct Vec3* tangent_data, int num_tris,
+	struct Vec3* normal_data, struct Vec2* uv_data, float* tangent_data, int num_tris,
 	int* tri_data, int shader, struct GameData* data)
 ;
 void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3* pos_data,
