@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.6)
 
-set(VLIB_INC_DIR ../vlib/src/libs)
+if(NOT DEFINED VLIB_INC_DIR)
+	set(VLIB_INC_DIR ../vlib/src/libs)
+endif()
 
 set(VLIB_SRC 
 	${VLIB_INC_DIR}/sort/sort.c
