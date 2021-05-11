@@ -1260,6 +1260,7 @@ void update_mesh_verts_from_memory(int mesh, struct Vec3 *pos_data,
 void update_custom_mesh_verts_from_memory(int mesh, int num_data_specs, struct GraphicsValueSpec *data_spec,
 	struct GameData *data)
 {
+    graphics_update_mesh_verts(data_spec, num_data_specs, data->meshes[mesh], data->graphics);
     /*BOOKMARK(Vidar): OpenGL
     struct Mesh m = data->meshes[mesh];
     glBindBuffer(GL_ARRAY_BUFFER, m.vertex_buffer);

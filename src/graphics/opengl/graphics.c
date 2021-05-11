@@ -35,11 +35,11 @@ struct Shader
 
 struct Mesh
 {
-    int num_vertex_buffers;
     GLuint vertex_array;
     GLuint vertex_buffers[16];
     GLuint index_buffer;
-    int num_indices;
+    int num_indices, num_verts;
+    int num_vertex_buffers;
 };
 
 struct Texture
@@ -325,6 +325,7 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
 			0, 0);
     }
     mesh->num_indices = num_indices;
+    mesh->num_verts = num_verts;
 
     glGenBuffers(1,&mesh->index_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
@@ -332,6 +333,29 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
                  GL_STATIC_DRAW);
 
     return mesh;
+}
+
+void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t num_value_specs, struct Mesh *mesh, struct GraphicsData* graphics)
+{
+    int num_verts = mesh->num_verts;
+    for (int i = 0; i < num_value_specs; i++) {
+        glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffers[i]);
+        unsigned char* buffer = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+        if (buffer) {
+			struct GraphicsValueSpec spec = value_specs[i];
+			int data_len = graphics_value_sizes[spec.type] * num_verts;
+			memcpy(buffer, spec.data, data_len);
+			buffer += data_len;
+            glUnmapBuffer(GL_ARRAY_BUFFER);
+        }
+        else {
+            GLenum err;
+            while ((err = glGetError()) != GL_NO_ERROR)
+            {
+                printf("OpenGL error %d\n", err);
+            }
+        }
+    }
 }
 
 struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint32_t h, uint32_t format, struct GraphicsData *graphics)
