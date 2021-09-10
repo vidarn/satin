@@ -12,8 +12,8 @@ float gui_text_width(nk_handle handle, float height, const char *text, int len)
 {
     struct GuiFont *gui_font = handle.ptr;
     float text_width = get_string_render_width(gui_font->font, text, len,
-        gui_font->context->data);
-    return text_width*(float)reference_resolution;
+        gui_font->context->data).c[0];
+    return text_width;
 }
 
 struct nk_user_font *gui_load_font(int font, struct GuiContext *context, struct GameData *data)

@@ -400,4 +400,14 @@ void graphics_set_depth_test(int enabled, struct GraphicsData *graphics)
         glDisable(GL_DEPTH_TEST);
     }
 }
-
+  
+void graphics_set_scissor_state(int enabled, int x1, int y1, int x2, int y2)
+{
+    if (enabled) {
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(x1, y1, x2 - x1, y2 - y1);
+    }
+    else {
+        glDisable(GL_SCISSOR_TEST);
+    }
+}

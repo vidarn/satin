@@ -88,5 +88,8 @@ void graphics_update_texture(struct Texture *tex, uint8_t *texture_data,
     uint32_t x, uint32_t y, uint32_t w, uint32_t h, struct GraphicsData *graphics)
 ;
 
+void graphics_set_scissor_state(int enabled, int x1, int y1, int x2, int y2)
+;
+
 void graphics_set_depth_test(int enabled, struct GraphicsData *graphics)
 ;

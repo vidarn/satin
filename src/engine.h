@@ -97,7 +97,9 @@ float *get_sprite_uv_offset(int sprite, struct GameData *data)
 struct Texture *get_sprite_texture(int sprite, struct GameData *data)
 ;
 
-void set_scissor_state(int enabled, float x1, float y1, float x2, float y2, struct RenderContext* context)
+void disable_scissor(struct RenderContext* context)
+;
+void set_scissor_state(int enabled, struct RenderRect rect, struct RenderContext* context)
 ;
 
 void render_to_memory(int w, int h, unsigned char *pixels,
@@ -105,7 +107,8 @@ void render_to_memory(int w, int h, unsigned char *pixels,
 void render_to_memory_float(int w, int h, float *pixels,
 	struct FrameData *frame_data, struct GameData *data);
 
-float get_string_render_width(int font_id, const char *text, int len,
+// Pass -1 for len if the string is zero-terminated
+struct RenderCoord get_string_render_width(int font_id, const char *text, int len,
     struct GameData *data);
 float get_font_height(int font, struct GameData *data);
 int load_font(const char *name, double font_size, struct GameData *data)
@@ -328,6 +331,8 @@ struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct Rende
 ;
 struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b, struct RenderContext* context)
 ;
+struct RenderCoord cset(struct RenderCoord a, int coords, struct RenderCoord b, struct RenderContext* context)
+;
 struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct RenderContext* context)
 ;
 
@@ -336,6 +341,10 @@ struct RenderRect rectw(float x1, float y1, float x2, float y2);
 struct RenderRect rectc(float x1, float y1, float x2, float y2);
 struct RenderRect rect(struct RenderCoord p1, struct RenderCoord p2);
 struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p, struct RenderContext* context)
+;
+struct RenderCoord rectcenter(struct RenderRect rect, struct RenderContext* context)
+;
+struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction, struct RenderContext* context)
 ;
 
 void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,

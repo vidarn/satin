@@ -59,12 +59,6 @@ struct RenderTexture{
     struct Sprite sprite;
 };
 
-struct ScissorState {
-	int enabled;
-	float x1, y1;
-	float x2, y2;
-};
-
 struct GameData{
     //TODO(Vidar):Remove these...
     uint32_t line_vertex_array;
@@ -167,8 +161,8 @@ void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniform
     }
     /*
     r->blend_mode = context->blend_mode;
-	r->scissor_state = buffer_len(context->frame_data->scissor_states) / sizeof(struct ScissorState) - 1;
     */
+	r->scissor_state = context->frame_data->num_scissor_states - 1;
 }
 
 //TODO(Vidar):Should we be able to specity the anchor point when rendering
@@ -240,6 +234,15 @@ struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b, struct 
     return a;
 }
 
+struct RenderCoord cset(struct RenderCoord a, int coords, struct RenderCoord b, struct RenderContext *context)
+{
+    b = cconvert(b, a.type, context);
+    a.c[0] = coords & 1 ? b.c[0] : a.c[0];
+    a.c[1] = coords & 2 ? b.c[1] : a.c[1];
+    a.c[2] = coords & 4 ? b.c[2] : a.c[2];
+    return a;
+}
+
 struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct RenderContext *context)
 {
     //TODO(Vidar):Take camera into account???
@@ -302,11 +305,30 @@ struct RenderRect rect(struct RenderCoord p1, struct RenderCoord p2)
 	struct RenderRect rect = { p1, p2 };
 	return rect;
 }
+struct RenderRect rectconvert(struct RenderRect rect, int type, struct RenderContext *context)
+{
+    rect.p[0] = cconvert(rect.p[0], type, context);
+    rect.p[1] = cconvert(rect.p[1], type, context);
+	return rect;
+}
 struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p, struct RenderContext *context)
 {
 	rect.p[0] = cadd(rect.p[0], p, context);
 	rect.p[1] = cadd(rect.p[1], p, context);
 	return rect;
+}
+struct RenderCoord rectcenter(struct RenderRect rect, struct RenderContext* context)
+{
+    return cscale(cadd(rect.p[0], rect.p[1], context), 0.5f);
+}
+
+struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction, struct RenderContext* context)
+{
+    int c = direction;
+    int other_c = 1 - direction;
+    struct RenderCoord split_point = cadd(cscale(rect.p[c], 1.f - x), cscale(rect.p[other_c], x), context);
+    rect.p[other_c] = cset(rect.p[other_c], 1, split_point, context);
+    return rect;
 }
 
 void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
@@ -541,19 +563,18 @@ void printf_screen(const char *format, int font, float x, float y,
     va_end(args);
 }
 
-float get_string_render_width(int font_id, const char *text, int len,
+struct RenderCoord get_string_render_width(int font_id, const char *text, int len,
     struct GameData *data)
 {
     struct Font *font = data->fonts + font_id;
-    float ret = 0.f;
+	float fx = 0.f;
+	float fy = 0.f;
     for(int i=0; i<len || (len==-1 && text[i] != 0); i++){
         stbtt_aligned_quad quad = {0};
-        float fx = 0.f;
-        float fy = 0.f;
         stbtt_GetBakedQuad(font->baked_chars, font_bitmap_size, font_bitmap_size,
                            text[i], &fx, &fy, &quad, 0);
-        ret+=fx*0.5f/(float)reference_resolution;
     }
+    struct RenderCoord ret = {RC_PIXELS, fx*0.5f, font->height*0.25f};
     return ret;
 }
 
@@ -750,10 +771,22 @@ struct Texture *get_sprite_texture(int sprite, struct GameData *data)
     return data->textures[s->texture];
 }
 
-void set_scissor_state(int enabled, float x1, float y1, float x2, float y2, struct RenderContext* context)
+void disable_scissor(struct RenderContext* context)
 {
-	//struct ScissorState state = { enabled, x1, y1, x2, y2 };
-	//buffer_add(&state, sizeof(struct ScissorState), context->frame_data->scissor_states);
+    set_scissor_state(0, rectc(0.f, 0.f, 1.f, 1.f), context);
+}
+
+void set_scissor_state(int enabled, struct RenderRect rect, struct RenderContext* context)
+{
+    rect = rectconvert(rect, RC_WINDOW, context);
+    struct FrameData* fd = context->frame_data;
+    struct ScissorState scissor_state = { enabled, rect.p[0].c[0], rect.p[0].c[1], rect.p[1].c[0], rect.p[1].c[1] };
+    if (fd->num_scissor_states == fd->alloc_scissor_states) {
+		fd->alloc_scissor_states *= 2;
+        fd->scissor_states = realloc(fd->scissor_states, fd->alloc_scissor_states * sizeof(struct ScissorState));
+    }
+    fd->scissor_states[fd->num_scissor_states] = scissor_state;
+    fd->num_scissor_states++;
 }
 
 static int add_texture(unsigned char *sprite_data, int sprite_w, int sprite_h,
@@ -1726,28 +1759,15 @@ void get_window_extents(float *x_min, float *x_max, float *y_min, float *y_max,
 struct FrameData *frame_data_new()
 {
     struct FrameData *frame_data = calloc(1,sizeof(struct FrameData));
-	//frame_data->scissor_states = buffer_create(512);
+	frame_data->alloc_scissor_states = 32;
+	frame_data->scissor_states = calloc(32, sizeof(struct ScissorState));
+	frame_data->num_scissor_states = 1;
+    frame_data->scissor_states[0].enabled = 0;
     return frame_data;
 }
 
 void frame_data_reset(struct FrameData *frame_data)
 {
-    {
-        struct RenderLineList *rll = &frame_data->render_line_list;
-        rll->num = 0;
-        while(rll->next != 0){
-            rll = rll->next;
-            rll->num = 0;
-        }
-    }
-    {
-        struct RenderSpriteList *rsl = &frame_data->render_sprite_list;
-        rsl->num = 0;
-        while(rsl->next != 0){
-            rsl = rsl->next;
-            rsl->num = 0;
-        }
-    }
     {
         struct RenderStringList *rsl = &frame_data->render_string_list;
         for(int i=0;i<rsl->num;i++){
@@ -1795,7 +1815,7 @@ void frame_data_reset(struct FrameData *frame_data)
             list = list->next;
         }
     }
-	//buffer_reset(frame_data->scissor_states);
+    frame_data->num_scissor_states = 1; // The first scissor state is the default (disabled) state. Keep it
     frame_data->clear = 0;
 }
 
@@ -2322,22 +2342,31 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
     }
 }
 
-void render_quads(struct FrameData *frame_data, float scale, float aspect, int w, int h,
-    struct GameData *data)
+void render_quads(struct FrameData* frame_data, float scale, float aspect, int w, int h,
+    struct GameData* data)
 {
-    graphics_set_depth_test(0,data->graphics);
-    struct RenderQuadList *list = &frame_data->render_quad_list;
+    graphics_set_depth_test(0, data->graphics);
+    struct RenderQuadList* list = &frame_data->render_quad_list;
     /* BOOKMARK(Vidar): OpenGL call
     int shader = -1;
     enum BlendMode blend_mode = BLEND_MODE_NONE;
-	int scissor_state = -1;
-	struct ScissorState* scissor_states = buffer_ptr(frame_data->scissor_states);
-	glDisable(GL_SCISSOR_TEST);
+    int scissor_state = -1;
+    struct ScissorState* scissor_states = buffer_ptr(frame_data->scissor_states);
+    glDisable(GL_SCISSOR_TEST);
     */
+    int current_scissor_state = -1;
     while(list != 0){
         for(int i=0;i<list->num;i++){
             struct RenderQuad *render_quad = list->quads + i;
             struct Shader *quad_shader = data->shaders[render_quad->shader];
+
+            int wanted_scissor_state = render_quad->scissor_state;
+            if (current_scissor_state != wanted_scissor_state) {
+                current_scissor_state = wanted_scissor_state;
+				struct ScissorState scissor_state = frame_data->scissor_states[current_scissor_state];
+                graphics_set_scissor_state(scissor_state.enabled, scissor_state.rect[0]*w,
+                    scissor_state.rect[1]*h, scissor_state.rect[2]*w, scissor_state.rect[3]*h);
+            }
 
             /* BOOKMARK(Vidar): OpenGL call
 			if (scissor_state != render_quad.scissor_state) {
@@ -2408,6 +2437,8 @@ void render_quads(struct FrameData *frame_data, float scale, float aspect, int w
         }
         list = list->next;
     }
+    //TODO: disable this
+    graphics_set_scissor_state(0, 0.f, 0.f, 0.f, 0.f);
 }
 
 static void render_internal(int w, int h, struct FrameData *frame_data,

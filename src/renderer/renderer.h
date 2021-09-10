@@ -43,9 +43,9 @@ struct RenderQuad{
 	//NOTE(Vidar):This is a matrix3
 	//TODO(Vidar):Handle this better
     float ALIGNED_(32) m[9];
-	float pad[7];
     int num_uniforms;
     int shader;
+    int scissor_state;
 };
 
 #define render_sprite_list_size 2048
@@ -53,18 +53,6 @@ struct RenderStringList{
     int num;
     struct RenderString strings[render_sprite_list_size];
     struct RenderStringList *next;
-};
-
-struct RenderSpriteList{
-    int num;
-    struct RenderSprite sprites[render_sprite_list_size];
-    struct RenderSpriteList *next;
-};
-
-struct RenderLineList{
-    int num;
-    struct RenderLine lines[render_sprite_list_size];
-    struct RenderLineList *next;
 };
 struct RenderMeshList{
     int num;
@@ -78,12 +66,17 @@ struct RenderQuadList{
 };
 
 struct FrameData{
-    struct RenderSpriteList render_sprite_list;
     struct RenderStringList render_string_list;
-    struct RenderLineList   render_line_list;
     struct RenderMeshList   render_mesh_list;
     struct RenderQuadList   render_quad_list;
     int clear;
     struct Color clear_color;
+    //TODO: can we keep it like this, or should it be like the RenderLists?
+    struct ScissorState* scissor_states;
+    int num_scissor_states, alloc_scissor_states;
 };
 
+struct ScissorState {
+    int enabled;
+    float rect[4];
+};
