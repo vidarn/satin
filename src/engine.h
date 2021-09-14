@@ -344,7 +344,11 @@ struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p, struct 
 ;
 struct RenderCoord rectcenter(struct RenderRect rect, struct RenderContext* context)
 ;
+struct RenderCoord rectsize(struct RenderRect rect, uint32_t type, struct RenderContext* context)
+;
 struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction, struct RenderContext* context)
+;
+struct RenderRect rectexpand(struct RenderRect rect, struct RenderCoord amount, struct RenderContext* context)
 ;
 
 void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,

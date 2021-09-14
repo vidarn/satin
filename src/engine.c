@@ -322,12 +322,25 @@ struct RenderCoord rectcenter(struct RenderRect rect, struct RenderContext* cont
     return cscale(cadd(rect.p[0], rect.p[1], context), 0.5f);
 }
 
+struct RenderCoord rectsize(struct RenderRect rect, uint32_t type, struct RenderContext* context)
+{
+    rect = rectconvert(rect, type, context);
+    return csubtract(rect.p[1], rect.p[0], context);
+}
+
 struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction, struct RenderContext* context)
 {
     int c = direction;
     int other_c = 1 - direction;
     struct RenderCoord split_point = cadd(cscale(rect.p[c], 1.f - x), cscale(rect.p[other_c], x), context);
     rect.p[other_c] = cset(rect.p[other_c], 1, split_point, context);
+    return rect;
+}
+
+struct RenderRect rectexpand(struct RenderRect rect, struct RenderCoord amount, struct RenderContext* context)
+{
+    rect.p[0] = csubtract(rect.p[0], amount, context);
+    rect.p[1] = cadd(rect.p[1], amount, context);
     return rect;
 }
 
@@ -1563,7 +1576,7 @@ int load_sprite_from_filename(const char *filename, struct GameData *data)
 
 float get_font_height(int font, struct GameData *data)
 {
-    return data->fonts[font].height*0.25f/(float)reference_resolution;
+    return data->fonts[font].height*0.5f;
 }
 
 int load_font_from_fp(FILE *fp, double font_size, struct GameData *data)
@@ -2347,13 +2360,6 @@ void render_quads(struct FrameData* frame_data, float scale, float aspect, int w
 {
     graphics_set_depth_test(0, data->graphics);
     struct RenderQuadList* list = &frame_data->render_quad_list;
-    /* BOOKMARK(Vidar): OpenGL call
-    int shader = -1;
-    enum BlendMode blend_mode = BLEND_MODE_NONE;
-    int scissor_state = -1;
-    struct ScissorState* scissor_states = buffer_ptr(frame_data->scissor_states);
-    glDisable(GL_SCISSOR_TEST);
-    */
     int current_scissor_state = -1;
     while(list != 0){
         for(int i=0;i<list->num;i++){
@@ -2368,59 +2374,6 @@ void render_quads(struct FrameData* frame_data, float scale, float aspect, int w
                     scissor_state.rect[1]*h, scissor_state.rect[2]*w, scissor_state.rect[3]*h);
             }
 
-            /* BOOKMARK(Vidar): OpenGL call
-			if (scissor_state != render_quad.scissor_state) {
-				struct ScissorState s = scissor_states[render_quad.scissor_state];
-				if (s.enabled) {
-					glEnable(GL_SCISSOR_TEST);
-					float s_w = s.x2 - s.x1;
-					float s_h = s.y2 - s.y1;
-					if (aspect > 1.f) {
-						s.x1 += (aspect - 1.f) * 0.5f;
-						s.x1 /= aspect;
-						s_w  /= aspect;
-					}
-					if (aspect < 1.f) {
-						s.y1 = (s.y1*aspect +(1.f - aspect) * 0.5f);
-						s_h  *= aspect;
-					}
-					glScissor(
-						(int)((float)w * s.x1),
-						(int)((float)h * s.y1),
-						(int)((float)w * s_w),
-						(int)((float)h * s_h)
-					);
-				}
-				else {
-					glDisable(GL_SCISSOR_TEST);
-				}
-				scissor_state = render_quad.scissor_state;
-			}
-            glBindVertexArray(data->quad_vertex_array);
-            glBindBuffer(GL_ARRAY_BUFFER,data->quad_vertex_buffer);
-            int loc=glGetUniformLocation(shader,"matrix");
-            if(loc == -1){
-                printf("Error: Could not find \"%s\" uniform in shader\n",
-                    "matrix");
-            }else{
-                for(int i=0;i<3;i++){
-                    render_quad.m[i*3+0] *= 2.f*scale;
-                    render_quad.m[i*3+1] *= 2.f*scale*aspect;
-                }
-                render_quad.m[6] -= 1.f;
-                render_quad.m[7] -= 1.f;
-                if(aspect < 1.f){
-                    render_quad.m[7] += 1 - scale*aspect;
-                }else{
-                    render_quad.m[6] += 1 - scale;
-                }
-                glUniformMatrix3fv(loc,1,GL_FALSE,render_quad.m);
-            }
-            process_uniforms(shader, render_quad.num_uniforms,
-                render_quad.uniforms, data);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-          */
-            
             for(int i=0;i<3;i++){
                 render_quad->m[i*3+0] *= 2.f*scale;
                 render_quad->m[i*3+1] *= 2.f*scale*aspect;
@@ -2437,7 +2390,7 @@ void render_quads(struct FrameData* frame_data, float scale, float aspect, int w
         }
         list = list->next;
     }
-    //TODO: disable this
+    //TODO: disable this once meshes support scissors too
     graphics_set_scissor_state(0, 0.f, 0.f, 0.f, 0.f);
 }
 

@@ -24,13 +24,13 @@ struct WindowProcParams {
 	int framebuffer_w;
 	int framebuffer_h;
 	int should_quit;
+	int window_active;
 };
 
 
 static LONG WINAPI
 WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	static PAINTSTRUCT ps;
 	struct WindowProcParams *params = GetWindowLongPtr(hWnd, GWLP_USERDATA);
 
 	switch (uMsg) {
@@ -49,6 +49,29 @@ WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 		}
 		return 0;
+		case WM_SETFOCUS:
+		{
+			params->window_active = 1;
+			break ;
+		}
+		case WM_KILLFOCUS:
+		{
+			params->window_active = 0;
+			break ;
+		}
+		case WM_ACTIVATE:
+		{
+			if (LOWORD(wParam) == WA_INACTIVE)
+				params->window_active = 0;
+			else // WA_ACTIVE or WA_CLICKACTIVE
+				params->window_active = 1;
+			break;
+		}
+		case WM_CAPTURECHANGED:
+		{
+			params->window_active = 0;
+			break;
+		}
 
 		/*
 	case WM_LBUTTONDOWN:
@@ -196,6 +219,7 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 	window_proc_params.input_state = &input_state;
 	window_proc_params.framebuffer_w = _framebuffer_w;
 	window_proc_params.framebuffer_h = _framebuffer_h;
+	window_proc_params.window_active = 1;
 	OutputDebugStringA("Launching game!\n");
 
 	if (show_console) {
@@ -362,12 +386,18 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				ScreenToClient(hWnd, &p);
 				drag_start_x = p.x;
 				drag_start_y = p.y;
+				printf("drag start %d %d\n", drag_start_x, drag_start_y);
+				window_proc_params.window_active = 1;
 				break;
 			}
 			case WM_LBUTTONUP:
 			{
 				input_state.mouse_down = 0;
 				input_state.mouse_state = MOUSE_NOTHING;
+				if (input_state.prev_mouse_state == MOUSE_DRAG) {
+					//ClipCursor(NULL); 
+					ReleaseCapture(); 
+				}
 				break;
 			}
 			case WM_MBUTTONDOWN:
@@ -390,6 +420,7 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 			case WM_MOUSEWHEEL:
 			{
 				input_state.scroll_delta_y = (float)GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120.f;
+				break;
 			}
 			default:
 				TranslateMessage(&msg);
@@ -430,12 +461,6 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 			input_state.delta_x = m_x - input_state.mouse_x;
 			input_state.delta_y = m_y - input_state.mouse_y;
 			if (cursor_locked(game_data)) {
-				/*
-				m_x -= input_state.delta_x;
-				m_y -= input_state.delta_y;
-				d_x -= input_state.delta_x;
-				d_y -= input_state.delta_y;
-				*/
 				float offset_x = d_x - m_x;
 				float offset_y = d_y - m_y;
 				m_x += offset_x;
@@ -444,11 +469,11 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				d_y += offset_y;
 
 				POINT tmp_p = { drag_start_x, drag_start_y };
-				ClientToScreen(hWnd, &tmp_p);
 				if (cursor_visible) {
 					while (ShowCursor(FALSE) >= 0) {}
 				}
 				cursor_visible = 0;
+				ClientToScreen(hWnd, &tmp_p);
 				SetCursorPos(tmp_p.x, tmp_p.y);
 			}
 			else {
@@ -480,6 +505,16 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				}
 			}
 
+			if (!window_proc_params.window_active && input_state.mouse_down) {
+				input_state.mouse_down = 0;
+				input_state.mouse_state = MOUSE_NOTHING;
+				if (input_state.prev_mouse_state == MOUSE_DRAG) {
+					//ClipCursor(NULL);
+					ReleaseCapture();
+				}
+			}
+
+
 			if (input_state.mouse_down || input_state.mouse_down_right || input_state.mouse_down_middle)
 			{
 				float dx = fabsf(input_state.drag_start_x - input_state.mouse_x);
@@ -498,6 +533,30 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 						input_state.mouse_state_middle = MOUSE_DRAG;
 					}
 				}
+			}
+
+			if (input_state.mouse_state == MOUSE_DRAG && input_state.prev_mouse_state != MOUSE_DRAG)
+			{
+				RECT rcClient;                 // client area rectangle 
+				POINT ptClientUL;              // client upper left corner 
+				POINT ptClientLR;              // client lower right corner 
+				SetCapture(hWnd); 
+				GetClientRect(hWnd, &rcClient); 
+				ptClientUL.x = rcClient.left; 
+				ptClientUL.y = rcClient.top; 
+	 
+				// Add one to the right and bottom sides, because the 
+				// coordinates retrieved by GetClientRect do not 
+				// include the far left and lowermost pixels. 
+	 
+				ptClientLR.x = rcClient.right + 1; 
+				ptClientLR.y = rcClient.bottom + 1; 
+				ClientToScreen(hWnd, &ptClientUL); 
+				ClientToScreen(hWnd, &ptClientLR); 
+	 
+				SetRect(&rcClient, ptClientUL.x, ptClientUL.y, 
+					ptClientLR.x, ptClientLR.y); 
+				//ClipCursor(&rcClient); 
 			}
 
 			float framebuffer_w = window_proc_params.framebuffer_w;
