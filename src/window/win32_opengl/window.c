@@ -386,7 +386,6 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				ScreenToClient(hWnd, &p);
 				drag_start_x = p.x;
 				drag_start_y = p.y;
-				printf("drag start %d %d\n", drag_start_x, drag_start_y);
 				window_proc_params.window_active = 1;
 				break;
 			}
