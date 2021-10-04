@@ -79,6 +79,8 @@ struct Shader *graphics_compile_shader(const char *vert_source, const char *frag
 
 struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_t num_value_specs, uint32_t num_verts, int *index_data, uint32_t num_indices, struct GraphicsData *graphics)
 ;
+void graphics_update_mesh(struct Mesh* mesh, struct GraphicsValueSpec* value_specs, uint32_t num_value_specs, uint32_t num_verts, int* index_data, uint32_t num_indices, struct GraphicsData* graphics)
+;
 void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t num_value_specs, struct Mesh *mesh, struct GraphicsData* graphics)
 ;
 

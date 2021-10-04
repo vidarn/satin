@@ -1279,6 +1279,13 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
      */
 }
 
+void update_custom_mesh_from_memory(int mesh, int num_verts, int num_tris,
+	int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct GameData *data)
+{
+    graphics_update_mesh(data->meshes[mesh], data_spec, num_data_specs, num_verts, tri_data, num_tris*3, data->graphics);
+}
+
+
 int load_custom_mesh_from_memory(int num_verts, int num_tris,
 int *tri_data, int num_data_specs, struct GraphicsValueSpec *data_spec, struct GameData *data)
 {

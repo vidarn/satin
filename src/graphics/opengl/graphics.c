@@ -329,10 +329,28 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
 
     glGenBuffers(1,&mesh->index_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,num_indices*4,index_data,
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,num_indices*sizeof(int),index_data,
                  GL_STATIC_DRAW);
 
     return mesh;
+}
+
+void graphics_update_mesh(struct Mesh* mesh, struct GraphicsValueSpec* value_specs, uint32_t num_value_specs, uint32_t num_verts, int* index_data, uint32_t num_indices, struct GraphicsData* graphics)
+{
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
+	unsigned char* buffer = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+	if (buffer) {
+		memcpy(buffer, index_data, num_indices*sizeof(int));
+		glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+	}
+	else {
+		GLenum err;
+		while ((err = glGetError()) != GL_NO_ERROR)
+		{
+			printf("OpenGL error %d\n", err);
+		}
+	}
+    graphics_update_mesh_verts(value_specs, num_value_specs, mesh, graphics);
 }
 
 void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t num_value_specs, struct Mesh *mesh, struct GraphicsData* graphics)
@@ -345,7 +363,6 @@ void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t 
 			struct GraphicsValueSpec spec = value_specs[i];
 			int data_len = graphics_value_sizes[spec.type] * num_verts;
 			memcpy(buffer, spec.data, data_len);
-			buffer += data_len;
             glUnmapBuffer(GL_ARRAY_BUFFER);
         }
         else {
