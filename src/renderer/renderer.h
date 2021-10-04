@@ -70,6 +70,7 @@ struct FrameData{
     struct RenderMeshList   render_mesh_list;
     struct RenderQuadList   render_quad_list;
     int clear;
+    int front_to_back;
     struct Color clear_color;
     //TODO: can we keep it like this, or should it be like the RenderLists?
     struct ScissorState* scissor_states;

@@ -73,39 +73,6 @@ WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 		}
 
-		/*
-	case WM_LBUTTONDOWN:
-	if(params) {
-		POINT p = {
-			LOWORD(lParam),
-			HIWORD(lParam)
-		};
-		if (DragDetect(hWnd, p)) {
-			printf("Drag\n");
-			params->input_state->mouse_state = MOUSE_DRAG;
-			POINT p;
-			GetCursorPos(&p);
-			ScreenToClient(hWnd, &p);
-			RECT r;
-			GetClientRect(hWnd, &r);
-			params->input_state->drag_start_x = (float)p.x / (float)(r.right - r.left);
-			params->input_state->drag_start_y = (float)p.y / (float)(r.top - r.bottom) + 1.f;
-		}
-		else {
-			printf("Click!\n");
-			params->input_state->mouse_state = MOUSE_CLICKED;
-		}
-		return 0;
-	}break;
-
-	case WM_LBUTTONUP:
-		if (params) {
-			printf("Drag stop\n");
-			params->input_state->mouse_state = MOUSE_NOTHING;
-			return 0;
-		}break;
-		*/
-
 	case WM_CLOSE:
 		if (params) {
 			params->should_quit = 1;
@@ -132,7 +99,7 @@ CreateOpenGLWindow(const char* title, int x, int y, struct WindowProcParams *win
 	/* only register the window class once - use hInstance as a flag. */
 	if (!hInstance) {
 		hInstance = GetModuleHandle(NULL);
-		wc.style = CS_OWNDC;
+		wc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
 		wc.lpfnWndProc = (WNDPROC)WindowProc;
 		wc.cbClsExtra = 0;
 		wc.cbWndExtra = 0;
@@ -418,7 +385,7 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 			}
 			case WM_MOUSEWHEEL:
 			{
-				input_state.scroll_delta_y = (float)GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120.f;
+				input_state.scroll_delta.y = (float)GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120.f;
 				break;
 			}
 			default:
@@ -445,6 +412,11 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 			float m_y;
 			float d_x;
 			float d_y;
+			m_x = p_x;
+			m_y = h - p_y;
+			d_x = drag_x;
+			d_y = h - drag_y;
+			/*
 			if (w < h) {
 				m_x = p_x / w;
 				m_y = 1.f - (p_y / w - 0.5 * (h - w) / w);
@@ -457,8 +429,9 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				d_x = drag_x / h - 0.5f * (w - h) / h;
 				d_y = 1.f - drag_y / h;
 			}
-			input_state.delta_x = m_x - input_state.mouse_x;
-			input_state.delta_y = m_y - input_state.mouse_y;
+			*/
+			input_state.delta.x = m_x - input_state.mouse_p.x;
+			input_state.delta.y = m_y - input_state.mouse_p.y;
 			if (cursor_locked(game_data)) {
 				float offset_x = d_x - m_x;
 				float offset_y = d_y - m_y;
@@ -481,10 +454,10 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				}
 				cursor_visible = 1;
 			}
-			input_state.mouse_x = m_x;
-			input_state.mouse_y = m_y;
-			input_state.drag_start_x = d_x;
-			input_state.drag_start_y = d_y;
+			input_state.mouse_p.x = m_x;
+			input_state.mouse_p.y = m_y;
+			input_state.drag_start.x = d_x;
+			input_state.drag_start.y = d_y;
 
 			for (int i_controller = 0; i_controller < max_num_controllers; i_controller++) {
 				XINPUT_STATE xinput_state = { 0 };
@@ -516,8 +489,8 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 
 			if (input_state.mouse_down || input_state.mouse_down_right || input_state.mouse_down_middle)
 			{
-				float dx = fabsf(input_state.drag_start_x - input_state.mouse_x);
-				float dy = fabsf(input_state.drag_start_y - input_state.mouse_y);
+				float dx = fabsf(input_state.drag_start.x - input_state.mouse_p.x);
+				float dy = fabsf(input_state.drag_start.y - input_state.mouse_p.y);
 				//printf("%f %f, %f %f\n",input_state.mouse_x,input_state.mouse_y,input_state.drag_start_x,input_state.drag_start_y);
 				float drag_dx = fabsf((float)GetSystemMetrics(SM_CXDRAG) / (float)(r.right - r.left));
 				float drag_dy = fabsf((float)GetSystemMetrics(SM_CYDRAG) / (float)(r.top - r.bottom));
@@ -598,7 +571,7 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 				input_state.mouse_state_middle = MOUSE_NOTHING;
 			}
 			input_state.num_keys_typed = 0;
-			input_state.scroll_delta_y = 0.f;
+			input_state.scroll_delta.y = 0.f;
 		}
 	}
 

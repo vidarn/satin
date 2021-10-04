@@ -42,8 +42,8 @@ void get_window_extents(float *x_min, float *x_max, float *y_min, float *y_max,
 
 struct Color rgb(float r, float g, float b);
 struct Color rgba(float r, float g, float b, float a);
-extern struct Color color_white;
-extern struct Color color_black;
+extern float color_white[];
+extern float color_black[];
 
 
 void get_sprite_size(int sprite, float *w, float *h, struct GameData *data);
@@ -107,10 +107,14 @@ void render_to_memory(int w, int h, unsigned char *pixels,
 void render_to_memory_float(int w, int h, float *pixels,
 	struct FrameData *frame_data, struct GameData *data);
 
+struct RenderCoord get_char_render_width(int font_id, char c, struct GameData* data)
+;
 // Pass -1 for len if the string is zero-terminated
 struct RenderCoord get_string_render_width(int font_id, const char *text, int len,
-    struct GameData *data);
-float get_font_height(int font, struct GameData *data);
+    struct GameData *data)
+;
+float get_font_height(int font, struct GameData *data)
+;
 int load_font(const char *name, double font_size, struct GameData *data)
 ;
 int load_font_from_filename(const char* filename, double font_size, struct GameData* data)
@@ -198,11 +202,18 @@ int get_mean_ticks(int length, struct GameData *data);
 int get_tick_length(struct GameData *data);
 int get_ticks(int i, struct GameData *data);
 
-struct FrameData *frame_data_new(void);
-void frame_data_reset(struct FrameData *frame_data);
-void frame_data_clear(struct FrameData *frame_data, struct Color col);
-void set_active_frame_data(struct FrameData *frame_data, struct GameData *data);
-struct FrameData *get_active_frame_data(struct GameData *data);
+struct FrameData* frame_data_new(void)
+;
+void frame_data_reset(struct FrameData *frame_data)
+;
+void frame_data_clear(struct FrameData* frame_data, struct Color col)
+;
+void frame_data_set_draw_order(struct FrameData* frame_data, int front_to_back)
+;
+void add_frame_data(struct FrameData* frame_data, struct GameData* data)
+;
+struct FrameData *get_active_frame_data(struct GameData *data)
+;
 
 int add_game_state(int state_type, struct GameData *data, void *argument);
 void remove_game_state(int state, struct GameData *data);
@@ -217,6 +228,19 @@ int was_key_typed(unsigned int key, struct InputState *input_state);
 int is_key_down(int key);
 
 float sum_values(float *values, int num);
+
+struct RenderCoord {
+    union {
+        float c[2];
+        struct {
+            float x, y;
+        };
+    };
+};
+struct RenderRect {
+	struct RenderCoord p[2];
+};
+
 
 
 //Input
@@ -261,10 +285,10 @@ struct ControllerState
 
 struct InputState
 {
-    float mouse_x, mouse_y;
-    float delta_x, delta_y;
-    float drag_start_x, drag_start_y;
-    float scroll_delta_x, scroll_delta_y;
+    struct RenderCoord mouse_p;
+    struct RenderCoord delta;
+    struct RenderCoord drag_start;
+    struct RenderCoord scroll_delta;
     int prev_mouse_state, prev_mouse_state_middle, prev_mouse_state_right;
     int mouse_state, mouse_state_middle, mouse_state_right;
     int mouse_down, mouse_down_middle, mouse_down_right;
@@ -298,57 +322,59 @@ struct GameState {
 };
 
 
+/*
 enum RenderCoordType {
 	RC_PIXELS,
 	RC_WINDOW,
 	RC_CANVAS,
 	RC_SCALE,
 };
+*/
 
-struct RenderCoord {
-	int type;
-	float c[3];
-};
-struct RenderRect {
-	struct RenderCoord p[2];
-};
-
-struct RenderCoord c1p(float x);
-struct RenderCoord c2p(float x, float y);
-struct RenderCoord c3p(float x, float y, float z);
-struct RenderCoord c1w(float x);
-struct RenderCoord c2w(float x, float y);
-struct RenderCoord c3w(float x, float y, float z);
-struct RenderCoord c1c(float x);
-struct RenderCoord c2c(float x, float y);
-struct RenderCoord c3c(float x, float y, float z);
-struct RenderCoord c1s(float x);
-struct RenderCoord c2s(float x, float y);
-struct RenderCoord c3s(float x, float y, float z);
+static struct RenderCoord czero = { 0.f, 0.f };
+struct RenderCoord cp(float x, float y)
+;
+struct RenderCoord cw(float x, float y, struct WindowData* window)
+;
+struct RenderCoord cc(float x, float y, struct WindowData *window)
+;
 struct RenderCoord cscale(struct RenderCoord a, float s)
 ;
-struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct RenderContext* context)
+struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b)
 ;
-struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b, struct RenderContext* context)
+struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b)
 ;
-struct RenderCoord cset(struct RenderCoord a, int coords, struct RenderCoord b, struct RenderContext* context)
+struct RenderCoord cmul(struct RenderCoord a, struct RenderCoord b)
 ;
-struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct RenderContext* context)
+struct RenderCoord cdiv(struct RenderCoord a, struct RenderCoord b)
+;
+struct RenderCoord cset(struct RenderCoord a, int coords, struct RenderCoord b)
 ;
 
 struct RenderRect rectp(float x1, float y1, float x2, float y2);
-struct RenderRect rectw(float x1, float y1, float x2, float y2);
-struct RenderRect rectc(float x1, float y1, float x2, float y2);
+struct RenderRect rectw(float x1, float y1, float x2, float y2, struct WindowData *window);
+struct RenderRect rectc(float x1, float y1, float x2, float y2, struct WindowData *window);
 struct RenderRect rect(struct RenderCoord p1, struct RenderCoord p2);
-struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p, struct RenderContext* context)
+struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p)
 ;
-struct RenderCoord rectcenter(struct RenderRect rect, struct RenderContext* context)
+struct RenderCoord rectcenter(struct RenderRect rect)
 ;
-struct RenderCoord rectsize(struct RenderRect rect, uint32_t type, struct RenderContext* context)
+struct RenderCoord rectsize(struct RenderRect rect)
 ;
-struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction, struct RenderContext* context)
+struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction)
 ;
-struct RenderRect rectexpand(struct RenderRect rect, struct RenderCoord amount, struct RenderContext* context)
+struct RenderRect rectexpand(struct RenderRect rect, struct RenderCoord amount)
+;
+struct RenderCoord rectmin(struct RenderRect a)
+;
+struct RenderCoord rectmax(struct RenderRect a)
+;
+struct RenderRect rectintersect(struct RenderRect a, struct RenderRect b)
+;
+struct RenderRect rectalign(struct RenderRect a, float ax, float ay, struct RenderRect b, float bx, float by,
+    struct RenderCoord offset)
+;
+struct RenderCoord rectpoint(struct RenderRect rect, float x, float y)
 ;
 
 void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
@@ -366,7 +392,11 @@ struct RenderCoord render_string_n(const char *string, int n, int font, struct R
 struct RenderCoord render_string(const char *string, int font, struct RenderCoord p,
     float *color, struct RenderContext *context)
 ;
-int is_point_in_rect(struct RenderCoord point, struct RenderRect rect, struct RenderContext *context)
+struct RenderCoord render_string_in_rect(const char* string, int font, 
+    struct RenderRect r, float align_x, float align_y,
+    struct RenderCoord offset, float* color, struct RenderContext* context)
+;
+int is_point_in_rect(struct RenderCoord point, struct RenderRect rect)
 ;
 struct Matrix3 get_rect_matrix3(struct RenderRect rect, struct RenderContext *context)
 ;

@@ -89,7 +89,9 @@ struct GameData{
     int active_game_state;
     int next_game_state;
     int ticks[64];
-    struct FrameData *frame_data;
+    struct FrameData **frame_data;
+    int num_frame_data;
+    int alloc_frame_data;
     int num_game_state_types;
     struct GameState *game_state_types;
     int num_game_states;
@@ -124,6 +126,10 @@ const float quad_render_data[] = {
 const int quad_render_index[] = {
     0, 1, 2, 2, 3, 0
 };
+
+
+static void render_sprite_rect_internal(struct Sprite* s, struct RenderRect rect, struct RenderContext* context)
+;
 
 void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniforms,
     int num_uniforms, struct RenderContext *context)
@@ -194,55 +200,103 @@ static void render_sprite_screen_internal(struct Sprite *sprite,float x, float y
     render_quad(shader, m, uniforms, num_uniforms, context);
 }
 
+static void render_sprite_internal(struct Sprite *sprite, struct RenderCoord c,
+    float width, struct Color color, int shader,
+    struct GraphicsValueSpec *uniforms_arg, int num_uniforms_arg,
+    struct RenderContext *context)
+{
+    struct RenderCoord res;
+    window_get_res(&res.x, &res.y, get_window_data(context->data));
+    c = cdiv(c, res);
+    float w = width;
+    float h = w*sprite->inv_aspect;
+    struct Matrix3 m= {
+        w/res.x, 0.f, 0.f,
+        0.f, h/res.y, 0.f,
+        c.x+context->offset_x, c.y+context->offset_y, 1.0f,
+    };
+    struct GraphicsValueSpec uniforms[32] = {
+        {"color",   &color,     GRAPHICS_VALUE_VEC4, 1},
+        {"sprite_uv",  sprite->uv_offset,    GRAPHICS_VALUE_VEC4, 1},
+        {"sprite",  context->data->textures[sprite->texture],    GRAPHICS_VALUE_TEX2, 1},
+    };
+    int num_uniforms = 3;
+    for(int i=0;i<num_uniforms_arg;i++){
+        uniforms[i+num_uniforms] = uniforms_arg[i];
+    }
+    num_uniforms += num_uniforms_arg;
+    render_quad(shader, m, uniforms, num_uniforms, context);
+}
 
 
-struct RenderCoord c1p(float x) { struct RenderCoord rc = { RC_PIXELS,x,0 }; return rc; }
-struct RenderCoord c2p(float x, float y) { struct RenderCoord rc = { RC_PIXELS,x,y,0 }; return rc; }
-struct RenderCoord c3p(float x, float y, float z) { struct RenderCoord rc = { RC_PIXELS,x,y,z }; return rc; }
-struct RenderCoord c1w(float x) { struct RenderCoord rc = { RC_WINDOW,x,0 }; return rc; }
-struct RenderCoord c2w(float x, float y) { struct RenderCoord rc = { RC_WINDOW,x,y,0 }; return rc; }
-struct RenderCoord c3w(float x, float y, float z) { struct RenderCoord rc = { RC_WINDOW,x,y,z }; return rc; }
-struct RenderCoord c1c(float x) { struct RenderCoord rc = { RC_CANVAS,x,0 }; return rc; }
-struct RenderCoord c2c(float x, float y) { struct RenderCoord rc = { RC_CANVAS,x,y,0 }; return rc; }
-struct RenderCoord c3c(float x, float y, float z) { struct RenderCoord rc = { RC_CANVAS,x,y,z }; return rc; }
-struct RenderCoord c1s(float x) { struct RenderCoord rc = { RC_SCALE,x,0 }; return rc; }
-struct RenderCoord c2s(float x, float y) { struct RenderCoord rc = { RC_SCALE,x,y,0 }; return rc; }
-struct RenderCoord c3s(float x, float y, float z) { struct RenderCoord rc = { RC_SCALE,x,y,z }; return rc; }
+
+struct RenderCoord cp(float x, float y)
+{
+    return (struct RenderCoord) {x, y};
+}
+struct RenderCoord cw(float x, float y, struct WindowData *window) {
+    struct RenderCoord ret;
+	float w, h;
+	window_get_res(&w, &h, window);
+    return (struct RenderCoord) {x*w, y*h};
+}
+struct RenderCoord cc(float x, float y, struct WindowData *window) {
+	float x_min, x_max, y_min, y_max;
+	window_get_extents(&x_min, &x_max, &y_min, &y_max, window);
+	float w, h;
+	window_get_res(&w, &h, window);
+    return (struct RenderCoord) {(x - x_min) * w / (x_max - x_min), (y - y_min) * h / (y_max - y_min)};
+}
 
 struct RenderCoord cscale(struct RenderCoord a, float s)
 {
     a.c[0] *= s;
     a.c[1] *= s;
-    a.c[2] *= s;
     return a;
 }
 
-struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b, struct RenderContext *context)
+struct RenderCoord cscalexy(struct RenderCoord a, float sx, float sy)
 {
-    b = cconvert(b, a.type, context);
+    a.c[0] *= sx;
+    a.c[1] *= sy;
+    return a;
+}
+
+struct RenderCoord cadd(struct RenderCoord a, struct RenderCoord b)
+{
     a.c[0] += b.c[0];
     a.c[1] += b.c[1];
-    a.c[2] += b.c[2];
     return a;
 }
-struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b, struct RenderContext *context)
+struct RenderCoord csubtract(struct RenderCoord a, struct RenderCoord b)
 {
-    b = cconvert(b, a.type, context);
     a.c[0] -= b.c[0];
     a.c[1] -= b.c[1];
-    a.c[2] -= b.c[2];
     return a;
 }
 
-struct RenderCoord cset(struct RenderCoord a, int coords, struct RenderCoord b, struct RenderContext *context)
+struct RenderCoord cmul(struct RenderCoord a, struct RenderCoord b)
 {
-    b = cconvert(b, a.type, context);
+    a.x *= b.x;
+    a.y *= b.y;
+    return a;
+}
+
+struct RenderCoord cdiv(struct RenderCoord a, struct RenderCoord b)
+{
+    a.x /= b.x;
+    a.y /= b.y;
+    return a;
+}
+
+struct RenderCoord cset(struct RenderCoord a, int coords, struct RenderCoord b)
+{
     a.c[0] = coords & 1 ? b.c[0] : a.c[0];
     a.c[1] = coords & 2 ? b.c[1] : a.c[1];
-    a.c[2] = coords & 4 ? b.c[2] : a.c[2];
     return a;
 }
 
+/*
 struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct RenderContext *context)
 {
     //TODO(Vidar):Take camera into account???
@@ -296,73 +350,116 @@ struct RenderCoord cconvert(struct RenderCoord rc, uint32_t to_type, struct Rend
 	}
 	return ret;
 }
+*/
 
-struct RenderRect rectp(float x1, float y1, float x2, float y2) { return rect(c2p(x1, y1), c2p(x2, y2)); }
-struct RenderRect rectw(float x1, float y1, float x2, float y2) { return rect(c2w(x1, y1), c2w(x2, y2)); }
-struct RenderRect rectc(float x1, float y1, float x2, float y2) { return rect(c2c(x1, y1), c2c(x2, y2)); }
+struct RenderRect rectp(float x1, float y1, float x2, float y2) { return rect(cp(x1, y1), cp(x2, y2)); }
+struct RenderRect rectw(float x1, float y1, float x2, float y2, struct WindowData *window) { return rect(cw(x1, y1, window), cw(x2, y2, window)); }
+struct RenderRect rectc(float x1, float y1, float x2, float y2, struct WindowData *window) { return rect(cc(x1, y1, window), cc(x2, y2, window)); }
 struct RenderRect rect(struct RenderCoord p1, struct RenderCoord p2)
 {
 	struct RenderRect rect = { p1, p2 };
 	return rect;
 }
-struct RenderRect rectconvert(struct RenderRect rect, int type, struct RenderContext *context)
+struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p)
 {
-    rect.p[0] = cconvert(rect.p[0], type, context);
-    rect.p[1] = cconvert(rect.p[1], type, context);
+	rect.p[0] = cadd(rect.p[0], p);
+	rect.p[1] = cadd(rect.p[1], p);
 	return rect;
 }
-struct RenderRect rectmove(struct RenderRect rect, struct RenderCoord p, struct RenderContext *context)
+struct RenderCoord rectcenter(struct RenderRect rect)
 {
-	rect.p[0] = cadd(rect.p[0], p, context);
-	rect.p[1] = cadd(rect.p[1], p, context);
-	return rect;
-}
-struct RenderCoord rectcenter(struct RenderRect rect, struct RenderContext* context)
-{
-    return cscale(cadd(rect.p[0], rect.p[1], context), 0.5f);
+    return cscale(cadd(rect.p[0], rect.p[1]), 0.5f);
 }
 
-struct RenderCoord rectsize(struct RenderRect rect, uint32_t type, struct RenderContext* context)
+struct RenderCoord rectsize(struct RenderRect rect)
 {
-    rect = rectconvert(rect, type, context);
-    return csubtract(rect.p[1], rect.p[0], context);
+    return csubtract(rect.p[1], rect.p[0]);
 }
 
-struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction, struct RenderContext* context)
+struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction)
 {
     int c = direction;
     int other_c = 1 - direction;
-    struct RenderCoord split_point = cadd(cscale(rect.p[c], 1.f - x), cscale(rect.p[other_c], x), context);
-    rect.p[other_c] = cset(rect.p[other_c], 1, split_point, context);
+    struct RenderCoord split_point = cadd(cscale(rect.p[c], 1.f - x), cscale(rect.p[other_c], x));
+    rect.p[other_c] = cset(rect.p[other_c], 1, split_point);
     return rect;
 }
 
-struct RenderRect rectexpand(struct RenderRect rect, struct RenderCoord amount, struct RenderContext* context)
+struct RenderRect rectexpand(struct RenderRect rect, struct RenderCoord amount)
 {
-    rect.p[0] = csubtract(rect.p[0], amount, context);
-    rect.p[1] = cadd(rect.p[1], amount, context);
+    rect.p[0] = csubtract(rect.p[0], amount);
+    rect.p[1] = cadd(rect.p[1], amount);
     return rect;
+}
+
+struct RenderCoord rectmin(struct RenderRect a)
+{
+    struct RenderCoord a1 = a.p[0];
+    struct RenderCoord a2 = a.p[1];
+	struct RenderCoord a_min = { 
+		a1.x < a2.x ? a1.x : a2.x,
+		a1.y < a2.y ? a1.y : a2.y,
+	};
+    return a_min;
+}
+
+struct RenderCoord rectmax(struct RenderRect a)
+{
+    struct RenderCoord a1 = a.p[0];
+    struct RenderCoord a2 = a.p[1];
+	struct RenderCoord a_max = {
+		a1.x > a2.x ? a1.x : a2.x,
+		a1.y > a2.y ? a1.y : a2.y,
+	};
+    return a_max;
+}
+
+struct RenderRect rectintersect(struct RenderRect a, struct RenderRect b)
+{
+    struct RenderCoord p1 = rectmax(rect(rectmin(a), rectmin(b)));
+    struct RenderCoord p2 = rectmin(rect(rectmax(a), rectmax(b)));
+    //TODO: What about when there's no intersection??
+    //Handle the case of no intersection
+    if (p1.x > p2.x || p1.y > p2.y) {
+        return rect(czero, czero);
+    }
+    return rect(p1, p2);
+}
+
+struct RenderRect rectalign(struct RenderRect a, float ax, float ay, struct RenderRect b, float bx, float by,
+    struct RenderCoord offset)
+{
+    struct RenderCoord anchor = cadd(cscalexy(b.p[0], 1.f - bx, 1.f - by), cscalexy(b.p[1], bx, by));
+    anchor = cadd(anchor, offset);
+    struct RenderCoord aoffset = cadd(cscalexy(a.p[0], 1.f - ax, 1.f - ay), cscalexy(a.p[1], ax, ay));
+    a = rectmove(a, csubtract(anchor, aoffset));
+    return a;
+}
+
+struct RenderCoord rectpoint(struct RenderRect rect, float x, float y)
+{
+	struct RenderCoord ret = cadd(cscalexy(rect.p[0], 1.f - x, 1.f - y), cscalexy(rect.p[1], x, y));
+    return ret;
 }
 
 void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoord thickness,
 	float *color, struct RenderContext *context)
 {
-	//TODO(Vidar):We should do all drawing in window coordinates instead...
-	p1 = cconvert(p1, RC_CANVAS, context);
-	p2 = cconvert(p2, RC_CANVAS, context);
-	struct RenderCoord tzero = { thickness.type,0.f };
-	struct RenderCoord tc = csubtract(cconvert(thickness, RC_CANVAS, context) , cconvert(tzero,RC_CANVAS, context), context);
-	float t = tc.c[0];
-
-    float dx1 = (p2.c[0]-p1.c[0]);
-    float dy1 = (p2.c[1]-p1.c[1]);
+    struct RenderCoord res;
+    window_get_res(&res.x, &res.y, get_window_data(context->data));
+    p1.x = floorf(p1.x) + 0.5f;
+    p1.y = floorf(p1.y) + 0.5f;
+    p2.x = floorf(p2.x) + 0.5f;
+    p2.y = floorf(p2.y) + 0.5f;
+    float dx1 = (p2.x-p1.x);
+    float dy1 = (p2.y-p1.y);
     float mag = sqrtf(dx1*dx1 + dy1*dy1);
-    float dx2 = -dy1/mag*t;
-    float dy2 =  dx1/mag*t;
+    float dx2 = -dy1/mag*thickness.x;
+    float dy2 =  dx1/mag*thickness.y;
     struct Matrix3 m= {
-        dx1, dy1, 0.f,
-        dx2, dy2, 0.f,
-        p1.c[0], p1.c[1], 1.0f,
+        dx1/res.x, dy1/res.y, 0.f,
+        dx2/res.x, dy2/res.y, 0.f,
+        (p1.x-dx2*0.5f)/res.x, (p1.y-dy2*0.5f)/res.y, 1.0f,
     };
     struct GraphicsValueSpec uniforms[] = {
         {"color", color, GRAPHICS_VALUE_VEC4, 1},
@@ -374,22 +471,25 @@ void render_line(struct RenderCoord p1, struct RenderCoord p2, struct RenderCoor
 void render_rect(struct RenderRect rect, struct RenderCoord thickness,
 	float *color, struct RenderContext* context)
 {
-	struct RenderCoord p1 = cconvert(rect.p[0], RC_CANVAS, context);
-	struct RenderCoord p2 = cconvert(rect.p[1], RC_CANVAS, context);
-    render_line(p1, c2c(p1.c[0],p2.c[1]), thickness, color, context);
-    render_line(c2c(p2.c[0],p1.c[1]), p2, thickness, color, context);
-    render_line(p1, c2c(p2.c[0],p1.c[1]), thickness, color, context);
-    render_line(c2c(p1.c[0],p2.c[1]), p2, thickness, color, context);
+	struct RenderCoord p1 = rect.p[0];
+	struct RenderCoord p2 = rect.p[1];
+    render_line(cp(p1.x,p2.y), p1, thickness, color, context);
+    render_line(cp(p2.x,p1.y), p2, thickness, color, context);
+    render_line(p1, cp(p2.x,p1.y), thickness, color, context);
+    render_line(p2, cp(p1.x,p2.y), thickness, color, context);
 }
 void render_rect_fill(struct RenderRect rect,
 	float *color, struct RenderContext* context)
 {
-	struct RenderCoord p1c = cconvert(rect.p[0], RC_CANVAS, context);
-	struct RenderCoord p2c = cconvert(rect.p[1], RC_CANVAS, context);
+    struct RenderCoord res;
+    window_get_res(&res.x, &res.y, get_window_data(context->data));
+
+    struct RenderCoord p1 = cdiv(rect.p[0], res);
+	struct RenderCoord p2 = cdiv(rect.p[1], res);
 	struct Matrix3 m = {
-		p2c.c[0] -p1c.c[0], 0, 0.f,
-		0, p2c.c[1] -p1c.c[1], 0.f,
-		p1c.c[0], p1c.c[1], 1.0f,
+		p2.x -p1.x, 0, 0.f,
+		0, p2.y -p1.y, 0.f,
+		p1.x, p1.y, 1.0f,
 	};
 	struct GraphicsValueSpec uniforms[] = {
         {"color", color, GRAPHICS_VALUE_VEC4, 1},
@@ -402,6 +502,7 @@ struct RenderCoord render_char(int char_index, int font_id, struct RenderCoord p
     float *color, struct RenderContext *context)
 {
     struct GameData *data = context->data;
+    struct WindowData* window_data = get_window_data(data);
     struct Font *font = data->fonts + font_id;
 	if (char_index >= font->first_char && char_index <= font->last_char) {
 		struct Sprite *sprite = font->sprites + char_index;
@@ -411,19 +512,18 @@ struct RenderCoord render_char(int char_index, int font_id, struct RenderCoord p
 			float fy = 0.f;
 			stbtt_GetBakedQuad(font->baked_chars, font_bitmap_size, font_bitmap_size,
 				char_index, &fx, &fy, &quad, 0);
-			struct RenderCoord offset = { RC_PIXELS, quad.x0 * 0.5f, -quad.y1 * 0.5f };
-			struct RenderCoord offset_zero = { RC_PIXELS,0.f, 0.f };
-			struct RenderCoord pc = cconvert(csubtract(cadd(p, offset, context),offset_zero,context), RC_CANVAS, context);
-			struct WindowData* window = get_window_data(data);
-			float w, h;
-			window_get_res(&w, &h, window);
-			float s = w > h ? h : w;
-			float width = sprite->width/s*(float)reference_resolution;
-			render_sprite_screen_internal(sprite, pc.c[0], pc.c[1], 0.f, width,
+            struct RenderRect char_rect = rectp(quad.x0, -quad.y1, quad.x1, -quad.y0);
+            p.x = floorf(p.x) + 0.5f;
+            p.y = floorf(p.y) + 0.5f;
+            char_rect = rectmove(char_rect, p);
+            render_sprite_rect_internal(sprite, char_rect, context);
+			/*
+			float width = sprite->width;
+			render_sprite_internal(sprite, pc, width,
 				*(struct Color*)color,context->data->sprite_shader, 0, 0, context);
+                */
 
-			struct RenderCoord offset2 = { RC_PIXELS, fx*0.5f, fy*0.5f};
-			p = csubtract(cadd(p, offset2, context),offset_zero,context);
+			p = cadd(p, cp(fx, fy));
 		}
 	}
 	return p;
@@ -446,43 +546,60 @@ struct RenderCoord render_string(const char* string, int font, struct RenderCoor
 
 }
 
-int is_point_in_rect(struct RenderCoord point, struct RenderRect rect, struct RenderContext *context)
+struct RenderCoord render_string_in_rect(const char* string, int font, 
+    struct RenderRect r, float align_x, float align_y,
+    struct RenderCoord offset, float* color, struct RenderContext* context)
 {
-	int type = point.type;
-	struct RenderCoord r1 = cconvert(rect.p[0], type, context);
-	struct RenderCoord r2 = cconvert(rect.p[1], type, context);
-	struct RenderCoord rect_min = { type,
-		r1.c[0] < r2.c[0] ? r1.c[0] : r2.c[0],
-		r1.c[1] < r2.c[1] ? r1.c[1] : r2.c[1],
-	};
-	struct RenderCoord rect_max = { type,
-		r1.c[0] > r2.c[0] ? r1.c[0] : r2.c[0],
-		r1.c[1] > r2.c[1] ? r1.c[1] : r2.c[1],
-	};
-	return point.c[0] > rect_min.c[0] && point.c[0] < rect_max.c[0] &&
-		point.c[1] > rect_min.c[1] && point.c[1] < rect_max.c[1];
+    struct RenderCoord text_size = get_string_render_width(font, string, -1, context->data);
+    struct RenderCoord p = rectalign(rect(czero, text_size), align_x, align_y,
+        r, align_x, align_y, offset, context).p[0];
+    return render_string(string, font, p, color, context);
 }
 
-struct Matrix3 get_rect_matrix3(struct RenderRect rect, struct RenderContext *context)
+int is_point_in_rect(struct RenderCoord point, struct RenderRect rect)
 {
-    struct RenderCoord c1 = cconvert(rect.p[0], RC_CANVAS, context);
-    struct RenderCoord c2 = cconvert(rect.p[1], RC_CANVAS, context);
+	struct RenderCoord r1 = rect.p[0];
+	struct RenderCoord r2 = rect.p[1];
+	struct RenderCoord rect_min = { 
+		r1.x < r2.x ? r1.x : r2.x,
+		r1.y < r2.y ? r1.y : r2.y,
+	};
+	struct RenderCoord rect_max = {
+		r1.x > r2.x ? r1.x : r2.x,
+		r1.y > r2.y ? r1.y : r2.y,
+	};
+	return point.x > rect_min.x && point.x < rect_max.x &&
+		point.y > rect_min.y && point.y < rect_max.y;
+}
+
+struct Matrix3 get_rect_matrix3(struct RenderRect rect)
+{
+    struct RenderCoord c1 = rect.p[0];
+    struct RenderCoord c2 = rect.p[1];
     struct Matrix3 m = multiply_matrix3(get_scale_matrix3_non_uniform(c2.c[0]-c1.c[0], c2.c[1]-c1.c[1]), get_translation_matrix3(c1.c[0], c1.c[1]));
     return m;
 }
 
 void render_sprite_rect(int sprite, struct RenderRect rect,
-    struct RenderContext *context)
+    struct RenderContext* context)
 {
-	struct RenderCoord p1c = cconvert(rect.p[0], RC_CANVAS, context);
-	struct RenderCoord p2c = cconvert(rect.p[1], RC_CANVAS, context);
+    struct Sprite* s = context->data->sprites + sprite;
+    render_sprite_rect_internal(s, rect, context);
+}
+
+static void render_sprite_rect_internal(struct Sprite *s, struct RenderRect rect,
+    struct RenderContext* context)
+{
+    struct RenderCoord res;
+    window_get_res(&res.x, &res.y, get_window_data(context->data));
+	struct RenderCoord p1 = cdiv(rect.p[0], res);
+	struct RenderCoord p2 = cdiv(rect.p[1], res);
 	struct Matrix3 m = {
-		p2c.c[0] -p1c.c[0], 0, 0.f,
-		0, p2c.c[1] -p1c.c[1], 0.f,
-		p1c.c[0], p1c.c[1], 1.0f,
+		p2.c[0] -p1.c[0], 0, 0.f,
+		0, p2.c[1] -p1.c[1], 0.f,
+		p1.c[0], p1.c[1], 1.0f,
 	};
     struct Color color = {1.f, 1.f, 1.f, 1.f};
-    struct Sprite* s = context->data->sprites + sprite;
     struct GraphicsValueSpec uniforms[32] = {
         {"color",   &color,     GRAPHICS_VALUE_VEC4, 1},
         {"sprite_uv",  s->uv_offset,    GRAPHICS_VALUE_VEC4, 1},
@@ -576,18 +693,26 @@ void printf_screen(const char *format, int font, float x, float y,
     va_end(args);
 }
 
-struct RenderCoord get_string_render_width(int font_id, const char *text, int len,
-    struct GameData *data)
+struct RenderCoord get_char_render_width(int font_id, char c, struct GameData* data)
 {
     struct Font *font = data->fonts + font_id;
 	float fx = 0.f;
 	float fy = 0.f;
+	stbtt_aligned_quad quad = {0};
+	stbtt_GetBakedQuad(font->baked_chars, font_bitmap_size, font_bitmap_size,
+					   c, &fx, &fy, &quad, 0);
+    struct RenderCoord ret = {fx, font->height*0.5};
+    return ret;
+}
+
+struct RenderCoord get_string_render_width(int font_id, const char *text, int len,
+    struct GameData *data)
+{
+    struct Font *font = data->fonts + font_id;
+    struct RenderCoord ret = {0.f, font->height*0.5};
     for(int i=0; i<len || (len==-1 && text[i] != 0); i++){
-        stbtt_aligned_quad quad = {0};
-        stbtt_GetBakedQuad(font->baked_chars, font_bitmap_size, font_bitmap_size,
-                           text[i], &fx, &fy, &quad, 0);
+        ret.x += get_char_render_width(font_id, text[i], data).x;
     }
-    struct RenderCoord ret = {RC_PIXELS, fx*0.5f, font->height*0.25f};
     return ret;
 }
 
@@ -786,12 +911,11 @@ struct Texture *get_sprite_texture(int sprite, struct GameData *data)
 
 void disable_scissor(struct RenderContext* context)
 {
-    set_scissor_state(0, rectc(0.f, 0.f, 1.f, 1.f), context);
+    set_scissor_state(0, rectc(0.f, 0.f, 1.f, 1.f, get_window_data(context->data)), context);
 }
 
 void set_scissor_state(int enabled, struct RenderRect rect, struct RenderContext* context)
 {
-    rect = rectconvert(rect, RC_WINDOW, context);
     struct FrameData* fd = context->frame_data;
     struct ScissorState scissor_state = { enabled, rect.p[0].c[0], rect.p[0].c[1], rect.p[1].c[0], rect.p[1].c[1] };
     if (fd->num_scissor_states == fd->alloc_scissor_states) {
@@ -1576,7 +1700,7 @@ int load_sprite_from_filename(const char *filename, struct GameData *data)
 
 float get_font_height(int font, struct GameData *data)
 {
-    return data->fonts[font].height*0.5f;
+    return data->fonts[font].height;
 }
 
 int load_font_from_fp(FILE *fp, double font_size, struct GameData *data)
@@ -1609,7 +1733,8 @@ int load_font_from_fp(FILE *fp, double font_size, struct GameData *data)
         font_bitmap_size, first_char, num_chars, font->baked_chars+first_char);
     free(font_data);
     unsigned char *font_rgba = calloc(font_bitmap_size*font_bitmap_size,4);
-    for(int i=0;i<font_bitmap_size*font_bitmap_size;i++){
+    int num_pixels = font_bitmap_size * font_bitmap_size;
+    for(int i=0;i<num_pixels;i++){
         font_rgba[i*4+0]=(unsigned char)((float)font_bitmap[i]);
         font_rgba[i*4+1]=(unsigned char)((float)font_bitmap[i]);
         font_rgba[i*4+2]=(unsigned char)((float)font_bitmap[i]);
@@ -1838,14 +1963,26 @@ void frame_data_clear(struct FrameData *frame_data, struct Color col)
     frame_data->clear_color = col;
 }
 
-void set_active_frame_data(struct FrameData *frame_data, struct GameData *data)
+void frame_data_set_draw_order(struct FrameData* frame_data, int front_to_back)
 {
-    data->frame_data = frame_data;
+    frame_data->front_to_back = front_to_back;
+}
+
+void add_frame_data(struct FrameData *frame_data, struct GameData *data)
+{
+    if (data->alloc_frame_data == data->num_frame_data) {
+        data->alloc_frame_data *= 2;
+        if (data->alloc_frame_data == 0) {
+            data->alloc_frame_data = 32;
+        }
+        data->frame_data = realloc(data->frame_data, data->alloc_frame_data*sizeof(struct FrameData*));
+    }
+    data->frame_data[data->num_frame_data++] = frame_data;
 }
 
 struct FrameData *get_active_frame_data(struct GameData *data)
 {
-    return data->frame_data;
+    return data->frame_data[data->num_frame_data-1];
 }
 
 int add_game_state(int state_type, struct GameData *data, void *argument)
@@ -1983,7 +2120,7 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
         data->quad_mesh = graphics_create_mesh(data_specs, num_data_specs, 4, (int*)quad_render_index, 6, data->graphics);
     }
 
-	//NOTE(Vidar):Create a default "invalid" sprite so that it is allways sprite 0
+	//NOTE(Vidar):Create a default "invalid" sprite so that it is always sprite 0
 	{
 		int res = 128;
 		uint8_t* pixels = calloc(res * res, 4);
@@ -2003,68 +2140,6 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 		load_image_from_memory(res, res, pixels, data);
 	}
     
-    /* BOOKMARK(Vidar): OpenGL call
-    data->sprite_shader = load_shader("sprite" SATIN_SHADER_SUFFIX, "sprite" SATIN_SHADER_SUFFIX, data, "pos", "uv",(char*)0);
-
-	glGenVertexArrays(1,&data->sprite_vertex_array);
-	glBindVertexArray(data->sprite_vertex_array);
-	glGenBuffers(1,&data->sprite_vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER,data->sprite_vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER,sizeof(sprite_render_data),sprite_render_data,
-        GL_DYNAMIC_DRAW);
-
-    {
-        int pos_loc=glGetAttribLocation(
-            data->shaders[data->sprite_shader].shader, "pos");
-        if(pos_loc == -1){
-            printf("Error: Could not find \"pos\" attribute in sprite shader\n");
-        }
-        glEnableVertexAttribArray(pos_loc);
-        glVertexAttribPointer(pos_loc,2,GL_FLOAT,GL_FALSE,
-            4*sizeof(GL_FLOAT),(void*)0);
-
-        int uv_loc=glGetAttribLocation(
-            data->shaders[data->sprite_shader].shader, "uv");
-        if(uv_loc == -1){
-            printf("Error: Could not find \"uv\" attribute in sprite shader\n");
-		}
-		else {
-			glEnableVertexAttribArray(uv_loc);
-			glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE,
-				4 * sizeof(GL_FLOAT), (void*)(2 * sizeof(GL_FLOAT)));
-		}
-    }
-
-	glGenVertexArrays(1,&data->line_vertex_array);
-	glBindVertexArray(data->line_vertex_array);
-	glGenBuffers(1,&data->line_vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER,data->line_vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER,sizeof(line_render_data),line_render_data,
-        GL_DYNAMIC_DRAW);
-
-    {
-        int pos_loc=glGetAttribLocation(
-            data->shaders[data->line_shader].shader,"pos");
-        if(pos_loc == -1){
-            printf("Error: Could not find \"pos\" attribute in shader\n");
-        }
-        glEnableVertexAttribArray(pos_loc);
-        glVertexAttribPointer(pos_loc,2,GL_FLOAT,GL_FALSE,
-            6*sizeof(GL_FLOAT),(void*)0);
-    }
-
-    glActiveTexture(GL_TEXTURE0);
-
-	glGenVertexArrays(1,&data->quad_vertex_array);
-	glBindVertexArray(data->quad_vertex_array);
-	glGenBuffers(1,&data->quad_vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER,data->quad_vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER,sizeof(quad_render_data),quad_render_data,
-        GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0); //"pos" is always at loc 0
-    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
-
-    */
 	if (num_game_states > 0) {
 		data->active_game_state = 0;
 		data->game_states = calloc(1, sizeof(struct GameState));
@@ -2101,8 +2176,8 @@ struct Color rgba(float r, float g, float b, float a)
     return ret;
 }
 
-struct Color color_white = { 1.f,1.f,1.f,1.f };
-struct Color color_black = { 0.f,0.f,0.f,1.f };
+float color_white[] = { 1.f,1.f,1.f,1.f };
+float color_black[] = { 0.f,0.f,0.f,1.f };
 
 void get_sprite_size(int sprite, float *w, float *h, struct GameData *data)
 {
@@ -2126,209 +2201,16 @@ struct Matrix3 get_sprite_matrix(int sprite, struct GameData *data)
     return ret;
 }
 
-void process_uniforms(int shader, int num_uniforms,
-    struct GraphicsValueSpec *uniforms, struct GameData *data)
-{
-    /* BOOKMARK(Vidar): OpenGL call
-    int num_textures = 0;
-    for(int j=0;j<num_uniforms;j++){
-        struct GraphicsValueSpec u = uniforms[j];
-        int loc=glGetUniformLocation(shader,u.name);
-        if(loc == -1){
-            printf("Warning: Could not find \"%s\" uniform in shader\n",
-                u.name);
-        }else{
-            switch(u.type){
-                case GRAPHICS_VALUE_INT:
-                    glUniform1iv(loc, u.num, u.data);
-                    break;
-                case GRAPHICS_VALUE_FLOAT:
-                    glUniform1fv(loc, u.num, u.data);
-                    break;
-                case GRAPHICS_VALUE_MAT4:
-                    glUniformMatrix4fv(loc,u.num,GL_FALSE,u.data);
-                    break;
-                case GRAPHICS_VALUE_MAT3:
-                    glUniformMatrix3fv(loc,u.num,GL_FALSE,u.data);
-                    break;
-                case GRAPHICS_VALUE_MAT2:
-                    glUniformMatrix2fv(loc,u.num,GL_FALSE,u.data);
-                    break;
-                case GRAPHICS_VALUE_VEC4:
-                    glUniform4fv(loc,u.num,u.data);
-                    break;
-                case GRAPHICS_VALUE_VEC3:
-                    glUniform3fv(loc,u.num,u.data);
-                    break;
-                case GRAPHICS_VALUE_VEC2:
-                    glUniform2fv(loc,u.num,u.data);
-                    break;
-                case GRAPHICS_VALUE_TEX2:
-                {
-                    int texture_id = *(int*)u.data;
-					if (texture_id >= 0) {
-						glUniform1i(loc, num_textures);
-						glActiveTexture(GL_TEXTURE0 + num_textures);
-						glBindTexture(GL_TEXTURE_2D, data->texture_ids[texture_id]);
-						num_textures++;
-					}
-                    break;
-                }
-                case GRAPHICS_VALUE_SPRITE_POINTER:
-                case GRAPHICS_VALUE_SPRITE:
-                {
-                    struct Sprite *sprite;
-                    if(u.type == GRAPHICS_VALUE_SPRITE_POINTER){
-                        sprite = *(struct Sprite**)u.data;
-                    }else{
-                        int sprite_id = *(int*)u.data;
-                        sprite = data->sprites + sprite_id;
-                    }
-                    glUniform1i(loc, num_textures);
-                    glActiveTexture(GL_TEXTURE0 + num_textures);
-                    glBindTexture(GL_TEXTURE_2D,
-                        data->texture_ids[sprite->texture]);
-                    num_textures++;
-                    size_t len = strlen(u.name) + 4;
-                    char *buffer = alloca(len);
-                    sprintf(buffer, "%s_uv", u.name);
-                    int uv_loc=glGetUniformLocation(shader,buffer);
-                    if(uv_loc == -1){
-                        printf("Error: Could not find \"%s\" uniform in shader\n",
-                            buffer);
-                    }else{
-                        glUniform4fv(uv_loc,1,sprite->uv_offset);
-                    }
-					if(sprite){
-						glUniform1i(loc, num_textures);
-						glActiveTexture(GL_TEXTURE0 + num_textures);
-						glBindTexture(GL_TEXTURE_2D,
-							data->texture_ids[sprite->texture]);
-						num_textures++;
-						size_t len = strlen(u.name) + 4;
-						char *buffer = alloca(len);
-						sprintf(buffer, "%s_uv", u.name);
-						int uv_loc=glGetUniformLocation(shader,buffer);
-						if(uv_loc == -1){
-							printf("Error: Could not find \"%s\" uniform in shader\n",
-								buffer);
-						}else{
-							glUniform4fv(uv_loc,1,sprite->uv_offset);
-						}
-					}
-                    break;
-                }
-            }
-        }
-    }
-     */
-}
-
 void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
     struct GameData *data)
 {
-    /* BOOKMARK(Vidar): OpenGL call
-	glDisable(GL_SCISSOR_TEST);
-	glEnable(GL_DEPTH_TEST);
-	glClear(GL_DEPTH_BUFFER_BIT);
-	int current_depth_test_state = 1;
-    enum BlendMode blend_mode = BLEND_MODE_NONE;
-     */
     graphics_set_depth_test(1,data->graphics);
     struct RenderMeshList *rml = &frame_data->render_mesh_list;
-    /*
-	int scissor_state = -1;
-	struct ScissorState* scissor_states = buffer_ptr(frame_data->scissor_states);
-    */
     while(rml != 0){
         for(int i=0;i<rml->num;i++){
             struct RenderMesh *render_mesh = rml->meshes + i;
             struct Mesh *mesh = data->meshes[render_mesh->mesh];
             struct Shader *shader = data->shaders[render_mesh->shader];
-            /* BOOKMARK(Vidar): OpenGL call
-			if (scissor_state != render_mesh->scissor_state) {
-				struct ScissorState s = scissor_states[render_mesh->scissor_state];
-				if (s.enabled) {
-					glEnable(GL_SCISSOR_TEST);
-					float s_w = s.x2 - s.x1;
-					float s_h = s.y2 - s.y1;
-					if (aspect > 1.f) {
-						s.x1 += (aspect - 1.f) * 0.5f;
-						s.x1 /= aspect;
-						s_w  /= aspect;
-					}
-					if (aspect < 1.f) {
-						s.y1 = (s.y1*aspect +(1.f - aspect) * 0.5f);
-						s_h  *= aspect;
-					}
-					glScissor(
-						(int)((float)w * s.x1),
-						(int)((float)h * s.y1),
-						(int)((float)w * s_w),
-						(int)((float)h * s_h)
-					);
-				}
-				else {
-					glDisable(GL_SCISSOR_TEST);
-				}
-				scissor_state = render_mesh->scissor_state;
-			}
-            int shader = mesh->shader->shader;
-            glUseProgram(shader);
-            glBindVertexArray(mesh->vertex_array);
-            glBindBuffer(GL_ARRAY_BUFFER,mesh->vertex_buffer);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh->index_buffer);
-            int loc_model=glGetUniformLocation(shader,"model_matrix");
-            int loc_view=glGetUniformLocation(shader,"view_matrix");
-            int loc_proj=glGetUniformLocation(shader,"proj_matrix");
-            if(loc_model == -1 || loc_view == -1 || loc_proj == -1){
-                if(loc_model == -1){
-                    printf("Error: Could not find \"%s\" uniform in shader\n",
-                           "model_matrix");
-                }
-                if(loc_view == -1){
-                    printf("Error: Could not find \"%s\" uniform in shader\n",
-                       "view_matrix");
-                }
-                if(loc_proj == -1){
-                    printf("Error: Could not find \"%s\" uniform in shader\n",
-                       "proj_matrix");
-                }
-            }else{
-                struct Matrix4 asp_m={0};
-                if(aspect<1.f){
-                    asp_m.m[0]=1.f;
-                    asp_m.m[5]=aspect;
-                } else{
-                    asp_m.m[0]=1.f/aspect;
-                    asp_m.m[5]=1.f;
-                }
-                asp_m.m[10]=1.f;
-                asp_m.m[15]=1.f;
-				struct Matrix4 view_m = *(struct Matrix4*) & render_mesh->view;
-				struct Matrix4 proj_m = multiply_matrix4(*(struct Matrix4*)&render_mesh->proj,asp_m);
-                struct Matrix4 model_m = *(struct Matrix4*)&render_mesh->m;
-                glUniformMatrix4fv(loc_view,1,GL_FALSE,(float*)&view_m.m[0]);
-                glUniformMatrix4fv(loc_proj,1,GL_FALSE,(float*)&proj_m.m[0]);
-                glUniformMatrix4fv(loc_model,1,GL_FALSE,(float*)&model_m.m[0]);
-            }
-            process_uniforms(shader, render_mesh->num_uniforms,
-                render_mesh->uniforms, data);
-
-			if (current_depth_test_state != render_mesh->depth_test) {
-				current_depth_test_state = render_mesh->depth_test;
-				if (current_depth_test_state) {
-					glEnable(GL_DEPTH_TEST);
-				}
-				else {
-					glDisable(GL_DEPTH_TEST);
-				}
-			}
-			if (render_mesh->callback) {
-				render_mesh->callback(render_mesh->callback_param);
-			}
-            glDrawElements(GL_TRIANGLES, mesh->num_tris*3,GL_UNSIGNED_INT,(void*)0);
-             */
             
             graphics_set_depth_test(render_mesh->depth_test, data->graphics);
             struct Matrix4 asp_m={0};
@@ -2362,7 +2244,16 @@ void render_quads(struct FrameData* frame_data, float scale, float aspect, int w
     struct RenderQuadList* list = &frame_data->render_quad_list;
     int current_scissor_state = -1;
     while(list != 0){
-        for(int i=0;i<list->num;i++){
+        int start = 0;
+        int stop = list->num;
+        int step = 1;
+        //BOOKMARK: Also traverse the lists backwards
+        if (frame_data->front_to_back) {
+            start = list->num - 1;
+            stop = -1;
+            step = -1;
+        }
+        for(int i=start;i!=stop;i+=step){
             struct RenderQuad *render_quad = list->quads + i;
             struct Shader *quad_shader = data->shaders[render_quad->shader];
 
@@ -2370,8 +2261,8 @@ void render_quads(struct FrameData* frame_data, float scale, float aspect, int w
             if (current_scissor_state != wanted_scissor_state) {
                 current_scissor_state = wanted_scissor_state;
 				struct ScissorState scissor_state = frame_data->scissor_states[current_scissor_state];
-                graphics_set_scissor_state(scissor_state.enabled, scissor_state.rect[0]*w,
-                    scissor_state.rect[1]*h, scissor_state.rect[2]*w, scissor_state.rect[3]*h);
+                graphics_set_scissor_state(scissor_state.enabled, scissor_state.rect[0],
+                    scissor_state.rect[1], scissor_state.rect[2], scissor_state.rect[3]);
             }
 
             for(int i=0;i<3;i++){
@@ -2399,11 +2290,15 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
 {
 
     if(frame_data != 0){
+        /* NOTE: Disabled since we don't render in 'canvas' coordinates anymore
         float aspect = (float)w/(float)h;
         float scale=1.f;
         if(aspect>1.f){
             scale=1.f/aspect;
         }
+        */
+        float aspect = 1.f;
+        float scale = 1.f;
         
         graphics_set_viewport(0, 0, w, h);
         graphics_begin_render_pass(&frame_data->clear_color.r, data->graphics);
@@ -2412,11 +2307,10 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
         }
         
         render_meshes(frame_data,aspect,w,h,data);
-        //glDisable(GL_DEPTH_TEST);
         
         render_quads(frame_data,scale,aspect,w,h,data);
+        graphics_end_render_pass(data->graphics);
     }
-    graphics_end_render_pass(data->graphics);
 }
 
 void render_to_memory(int w, int h, unsigned char *pixels,
@@ -2524,8 +2418,10 @@ void render_to_memory_float(int w, int h, float *pixels,
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data)
 {
     
-    //glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    render_internal(framebuffer_w, framebuffer_h, data->frame_data, data);
+    for (int i = 0; i < data->num_frame_data; i++) {
+        render_internal(framebuffer_w, framebuffer_h, data->frame_data[i], data);
+    }
+    data->num_frame_data = 0;
 }
 
 int update(int ticks, struct InputState input_state, struct GameData *data)

@@ -49,11 +49,11 @@ void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, stru
 {
     struct nk_context *ctx = &gui->ctx;
 
-    float mx = input_state.mouse_x*(float)reference_resolution;
-    float my = (1.f-input_state.mouse_y)*(float)reference_resolution;
-	float dx = input_state.delta_x*(float)reference_resolution;
-	float dy = -input_state.delta_y*(float)reference_resolution;
-	float sy = input_state.scroll_delta_y;
+    float mx = input_state.mouse_p.x*(float)reference_resolution;
+    float my = (1.f-input_state.mouse_p.y)*(float)reference_resolution;
+	float dx = input_state.delta.x*(float)reference_resolution;
+	float dy = -input_state.delta.y*(float)reference_resolution;
+	float sy = input_state.scroll_delta.y;
 
     nk_input_begin(ctx);
     //nk_input_motion(ctx, mx, my);
@@ -94,7 +94,7 @@ void gui_begin_frame(struct GuiContext *gui, struct InputState input_state, stru
 	}
 	gui->input = input_state;
 	gui->render_context = render_context;
-	gui->mp = c2c(input_state.mouse_x, input_state.mouse_y);
+	gui->mp = input_state.mouse_p;
 
 }
 
@@ -408,12 +408,14 @@ int gui_button(struct RenderRect button_rect, const char* caption, struct GuiCon
 		}
 	}
 	render_rect_fill(button_rect, col, context->render_context);
-	render_rect(button_rect, c1p(1.f), context->border_col, context->render_context);
+	render_rect(button_rect, cp(1.f, 0.f, get_window_data(context->data)), context->border_col, context->render_context);
 	if (caption) {
 		//TODO(Vidar):Functions for getting different parts of a rect
+        /*
 		float button_h = (cconvert(button_rect.p[1], RC_PIXELS, context->render_context).c[1] - cconvert(button_rect.p[0], RC_PIXELS, context->render_context).c[1]);
 		struct RenderCoord text_p = cadd(button_rect.p[0], c2p(10.f, button_h * 0.5f), context->render_context);
 		render_string(caption, context->font, text_p, context->text_col, context->render_context);
+        */
 	}
 	return ret;
 }
