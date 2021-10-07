@@ -385,6 +385,15 @@ struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction)
     return rect;
 }
 
+struct RenderRect rectsplit_y(struct RenderRect rect, float f, int direction)
+{
+    int c = direction;
+    int other_c = 1 - direction;
+    rect.p[other_c].y = rect.p[c].y * ( 1.f - f) + rect.p[other_c].y * f;
+    return rect;
+}
+
+
 struct RenderRect rectexpand(struct RenderRect rect, struct RenderCoord amount)
 {
     rect.p[0] = csubtract(rect.p[0], amount);
@@ -572,12 +581,36 @@ int is_point_in_rect(struct RenderCoord point, struct RenderRect rect)
 		point.y > rect_min.y && point.y < rect_max.y;
 }
 
+void point_coords_in_rect(struct RenderCoord point, struct RenderRect rect, float* x, float* y)
+{
+	struct RenderCoord r1 = rect.p[0];
+	struct RenderCoord r2 = rect.p[1];
+    if(x) *x = (point.x - r1.x) / (r2.x - r1.x);
+    if(y) *y = (point.y - r1.y) / (r2.y - r1.y);
+}
+
 struct Matrix3 get_rect_matrix3(struct RenderRect rect)
 {
     struct RenderCoord c1 = rect.p[0];
     struct RenderCoord c2 = rect.p[1];
     struct Matrix3 m = multiply_matrix3(get_scale_matrix3_non_uniform(c2.c[0]-c1.c[0], c2.c[1]-c1.c[1]), get_translation_matrix3(c1.c[0], c1.c[1]));
     return m;
+}
+
+struct Matrix4 get_rect_matrix4(struct RenderRect rect, float z, struct RenderContext *context)
+{
+    float rx0 = rect.p[0].c[0];
+    float rx1 = rect.p[1].c[0];
+    float ry0 = rect.p[0].c[1];
+    float ry1 = rect.p[1].c[1];
+    float rw = rx1 - rx0;
+    float rh = ry1 - ry0;
+    float resx, resy;
+    window_get_res(&resx, &resy, get_window_data(context->data));
+    return multiply_matrix4(
+        get_scale_matrix4_non_uniform(rw*2.f/resx, rh*2.f/resy, 1.f),
+        get_translation_matrix4(-1.f + 2.f*rx0/resx, -1.f + 2.f*ry0/resy, z)
+    );
 }
 
 void render_sprite_rect(int sprite, struct RenderRect rect,

@@ -363,6 +363,8 @@ struct RenderCoord rectsize(struct RenderRect rect)
 ;
 struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction)
 ;
+struct RenderRect rectsplit_y(struct RenderRect rect, float f, int direction)
+;
 struct RenderRect rectexpand(struct RenderRect rect, struct RenderCoord amount)
 ;
 struct RenderCoord rectmin(struct RenderRect a)
@@ -392,11 +394,15 @@ struct RenderCoord render_string_n(const char *string, int n, int font, struct R
 struct RenderCoord render_string(const char *string, int font, struct RenderCoord p,
     float *color, struct RenderContext *context)
 ;
-struct RenderCoord render_string_in_rect(const char* string, int font, 
+struct RenderCoord render_string_in_rect(const char* string, int font,
     struct RenderRect r, float align_x, float align_y,
     struct RenderCoord offset, float* color, struct RenderContext* context)
+;
+void point_coords_in_rect(struct RenderCoord point, struct RenderRect rect, float *x, float *y)
 ;
 int is_point_in_rect(struct RenderCoord point, struct RenderRect rect)
 ;
 struct Matrix3 get_rect_matrix3(struct RenderRect rect, struct RenderContext *context)
+;
+struct Matrix4 get_rect_matrix4(struct RenderRect rect, float z, struct RenderContext *context)
 ;

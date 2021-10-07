@@ -338,19 +338,40 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
 void graphics_update_mesh(struct Mesh* mesh, struct GraphicsValueSpec* value_specs, uint32_t num_value_specs, uint32_t num_verts, int* index_data, uint32_t num_indices, struct GraphicsData* graphics)
 {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
-	unsigned char* buffer = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
-	if (buffer) {
-		memcpy(buffer, index_data, num_indices*sizeof(int));
-		glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-	}
-	else {
-		GLenum err;
-		while ((err = glGetError()) != GL_NO_ERROR)
-		{
-			printf("OpenGL error %d\n", err);
-		}
-	}
-    graphics_update_mesh_verts(value_specs, num_value_specs, mesh, graphics);
+    if (mesh->num_indices == num_indices) {
+        unsigned char* buffer = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+        if (buffer) {
+            memcpy(buffer, index_data, num_indices * sizeof(int));
+            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+        }
+        else {
+            GLenum err;
+            while ((err = glGetError()) != GL_NO_ERROR)
+            {
+                printf("OpenGL error %d\n", err);
+            }
+        }
+    } else {
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,num_indices*sizeof(int),index_data,
+                     GL_STATIC_DRAW);
+        mesh->num_indices = num_indices;
+    }
+    assert(num_value_specs == mesh->num_vertex_buffers);
+    if (num_verts == mesh->num_verts) {
+        graphics_update_mesh_verts(value_specs, num_value_specs, mesh, graphics);
+    }else {
+        glBindVertexArray(mesh->vertex_array);
+        for(int i=0;i< num_value_specs; i++){
+            struct GraphicsValueSpec spec = value_specs[i];
+            glBindBuffer(GL_ARRAY_BUFFER,mesh->vertex_buffers[i]);
+            glBufferData(GL_ARRAY_BUFFER,graphics_value_sizes[spec.type]*num_verts
+                ,spec.data, GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(i,graphics_value_nums[spec.type],
+                graphics_value_opengl_types[spec.type],GL_FALSE,
+                0, 0);
+        }
+        mesh->num_verts = num_verts;
+    }
 }
 
 void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t num_value_specs, struct Mesh *mesh, struct GraphicsData* graphics)
