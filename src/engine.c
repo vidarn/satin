@@ -1888,6 +1888,7 @@ void create_sprite_atlas(struct GameData *data)
         sprite++;
     }
     int texture_id = add_texture(atlas_data,w,h,GRAPHICS_PIXEL_FORMAT_RGBA,data);
+    free(atlas_data);
     sprite=data->sprites;
 	sprite_data = data->sprite_data;
     for(int i=0;i<data->num_sprites;i++){
@@ -1966,7 +1967,7 @@ void frame_data_reset(struct FrameData *frame_data)
                 struct RenderMesh *rm = rml->meshes + i;
                 //NOTE(Vidar):The first three uniforms are the view, model and projection matrices, don't
                 // try to free them!
-                for(int i=4;i<rm->num_uniforms;i++){
+                for(int i=3;i<rm->num_uniforms;i++){
                     free(rm->uniforms[i].name);
                     free(rm->uniforms[i].data);
                 }
