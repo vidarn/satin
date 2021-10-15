@@ -28,8 +28,12 @@ struct Shader
 {
     char *vert_filename;
     char *frag_filename;
+    char *uniform_names;
+    int* uniform_locations;
     int valid;
     int handle;
+    int uniform_names_stride;
+    int num_uniforms;
 	enum GraphicsBlendMode blend_mode;
 };
 
@@ -141,7 +145,16 @@ void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader,
     int num_textures = 0;
     for(int j=0;j<num_uniform_specs;j++){
         struct GraphicsValueSpec u = uniform_specs[j];
-        int loc=glGetUniformLocation(shader_handle,u.name);
+        int loc = -1;
+        for (int i = 0; i < shader->num_uniforms; i++) {
+            if (strcmp(shader->uniform_names + i*shader->uniform_names_stride, u.name) == 0) {
+                loc = shader->uniform_locations[i];
+            }
+        }
+        if (loc == -1) {
+            //Fallback if we could not find the uniform name for some reason.
+            loc=glGetUniformLocation(shader_handle,u.name);
+        }
         if(loc == -1){
             printf("Warning: Could not find \"%s\" uniform in shader (%s,%s)\n",
                 u.name, shader->vert_filename, shader->frag_filename);
@@ -288,6 +301,32 @@ struct Shader *graphics_compile_shader(const char *vert_filename, const char *fr
 
             shader->valid  = 1;
             shader->handle = shader_handle;
+
+            int num_uniforms;
+            glGetProgramiv(shader_handle, GL_ACTIVE_UNIFORMS, &num_uniforms);
+            int max_uniform_name_length;
+            glGetProgramiv(shader_handle, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_uniform_name_length);
+            int* uniform_ids = calloc(num_uniforms , sizeof(int));
+            for (int i = 0; i < num_uniforms; i++) {
+                uniform_ids[i] = i;
+            }
+            char* uniform_names = calloc(num_uniforms * max_uniform_name_length , sizeof(char));
+            int* uniform_locations = calloc(num_uniforms, sizeof(int));
+            for (int i = 0; i < num_uniforms; i++) {
+                GLsizei name_length;
+                char* uniform_name = uniform_names + i * max_uniform_name_length;
+                glGetActiveUniformName(shader_handle, i, max_uniform_name_length, &name_length, uniform_name);
+                uniform_locations[i] = glGetUniformLocation(shader_handle, uniform_name);
+                //For some reason, arrays are reported with [0] at the end. We want to remove that so that we can match without it later
+                for (int j = 0; j < name_length; j++) {
+                    if (uniform_name[j] == '[') uniform_name[j] = 0;
+                }
+            }
+            shader->uniform_names = uniform_names;
+            shader->uniform_names_stride = max_uniform_name_length;
+            shader->uniform_locations = uniform_locations;
+            shader->num_uniforms = num_uniforms;
+            free(uniform_ids);
 
 cleanup:
             //NOTE(Vidar):We only need one free since the buffers are allocated together
