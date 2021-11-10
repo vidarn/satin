@@ -4,9 +4,14 @@
 #include <Windows.h>
 #endif
 
+#ifdef EMSCRIPTEN
+#include <GLES3/gl3.h>
+#else
+
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
 #else
+
 #include <GL/gl.h>
 
 #ifdef WIN32
@@ -21,6 +26,8 @@ OPENGL_FUNC(PFNWGLCREATECONTEXTATTRIBSARBPROC, wglCreateContextAttribsARB)
 OPENGL_FUNC(PFNGLACTIVETEXTUREPROC, glActiveTexture)
 #endif
 #undef OPENGL_FUNC
+#endif
+
 #endif
 
 void opengl_load(void)

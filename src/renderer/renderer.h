@@ -72,6 +72,7 @@ struct FrameData{
     int clear;
     int front_to_back;
     struct Color clear_color;
+    struct RenderRect viewport_3d;
     //TODO: can we keep it like this, or should it be like the RenderLists?
     struct ScissorState* scissor_states;
     int num_scissor_states, alloc_scissor_states;

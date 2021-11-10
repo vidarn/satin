@@ -376,6 +376,12 @@ struct RenderCoord rectsize(struct RenderRect rect)
     return csubtract(rect.p[1], rect.p[0]);
 }
 
+float rectaspect(struct RenderRect rect)
+{
+    struct RenderCoord size = rectsize(rect);
+    return size.y / size.x;
+}
+
 struct RenderRect rectsplit_x(struct RenderRect rect, float x, int direction)
 {
     int c = direction;
@@ -561,7 +567,7 @@ struct RenderCoord render_string_in_rect(const char* string, int font,
 {
     struct RenderCoord text_size = get_string_render_width(font, string, -1, context->data);
     struct RenderCoord p = rectalign(rect(czero, text_size), align_x, align_y,
-        r, align_x, align_y, offset, context).p[0];
+        r, align_x, align_y, offset).p[0];
     return render_string(string, font, p, color, context);
 }
 
@@ -1594,9 +1600,8 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     s.width        = (float)sprite_w;
     s.inv_aspect   = (float)sprite_h/(float)sprite_w;
 
-	return texture;
+	//return texture;
 
-	/*
     //TODO(Vidar): double the amount of sprites instead?
     data->sprites = realloc(data->sprites,(data->num_sprites+1)
         *sizeof(struct Sprite));
@@ -1612,7 +1617,6 @@ int load_image_from_memory(int sprite_w, int sprite_h,
     data->num_sprites++;
 
     return data->num_sprites-1;
-	*/
 }
 
 static int load_image_from_fp(FILE* fp, struct GameData* data)
@@ -2009,6 +2013,11 @@ void frame_data_set_draw_order(struct FrameData* frame_data, int front_to_back)
     frame_data->front_to_back = front_to_back;
 }
 
+void frame_data_set_viewport_3d(struct FrameData* frame_data, struct RenderRect rect)
+{
+    frame_data->viewport_3d = rect;
+}
+
 void add_frame_data(struct FrameData *frame_data, struct GameData *data)
 {
     if (data->alloc_frame_data == data->num_frame_data) {
@@ -2242,11 +2251,26 @@ struct Matrix3 get_sprite_matrix(int sprite, struct GameData *data)
     return ret;
 }
 
-void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
-    struct GameData *data)
+void render_meshes(struct FrameData *frame_data, struct GameData *data)
 {
-    graphics_set_depth_test(1,data->graphics);
     struct RenderMeshList *rml = &frame_data->render_mesh_list;
+    if (!rml || !rml->num) {
+        return;
+    }
+    struct Matrix4 asp_m={0};
+    float aspect = rectaspect(frame_data->viewport_3d);
+    if(aspect>1.f){
+        asp_m.m[0]=1.f;
+        asp_m.m[5]=1.f/aspect;
+    } else{
+        asp_m.m[0]=aspect;
+        asp_m.m[5]=1.f;
+    }
+    asp_m.m[10]=1.f;
+    asp_m.m[15]=1.f;
+    struct RenderCoord p1 = frame_data->viewport_3d.p[0];
+    struct RenderCoord p2 = frame_data->viewport_3d.p[1];
+    graphics_set_viewport(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
     while(rml != 0){
         for(int i=0;i<rml->num;i++){
             struct RenderMesh *render_mesh = rml->meshes + i;
@@ -2254,16 +2278,6 @@ void render_meshes(struct FrameData *frame_data, float aspect, int w, int h,
             struct Shader *shader = data->shaders[render_mesh->shader];
             
             graphics_set_depth_test(render_mesh->depth_test, data->graphics);
-            struct Matrix4 asp_m={0};
-            if(aspect<1.f){
-                asp_m.m[0]=1.f;
-                asp_m.m[5]=aspect;
-            } else{
-                asp_m.m[0]=1.f/aspect;
-                asp_m.m[5]=1.f;
-            }
-            asp_m.m[10]=1.f;
-            asp_m.m[15]=1.f;
             
             *(struct Matrix4*)&render_mesh->proj = multiply_matrix4(*(struct Matrix4*)&render_mesh->proj,asp_m);
             
@@ -2331,15 +2345,6 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
 {
 
     if(frame_data != 0){
-        /* NOTE: Disabled since we don't render in 'canvas' coordinates anymore
-        float aspect = (float)w/(float)h;
-        float scale=1.f;
-        if(aspect>1.f){
-            scale=1.f/aspect;
-        }
-        */
-        float aspect = 1.f;
-        float scale = 1.f;
         
         graphics_set_viewport(0, 0, w, h);
         graphics_begin_render_pass(&frame_data->clear_color.r, data->graphics);
@@ -2347,9 +2352,11 @@ static void render_internal(int w, int h, struct FrameData *frame_data,
             graphics_clear(data->graphics);
         }
         
-        render_meshes(frame_data,aspect,w,h,data);
+        //TODO: Get viewport_3d from the context
+        render_meshes(frame_data,data);
         
-        render_quads(frame_data,scale,aspect,w,h,data);
+        graphics_set_viewport(0, 0, w, h);
+        render_quads(frame_data,1.f,1.f,w,h,data);
         graphics_end_render_pass(data->graphics);
     }
 }

@@ -34,6 +34,18 @@ struct Color {
     float r,g,b,a;
 };
 
+struct RenderCoord {
+    union {
+        float c[2];
+        struct {
+            float x, y;
+        };
+    };
+};
+struct RenderRect {
+	struct RenderCoord p[2];
+};
+
 extern int reference_resolution;
 
 
@@ -156,6 +168,9 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3* pos_dat
 	struct Vec3* normal_data, struct Vec2* uv_data, struct Vec3* tangent_data, int num_tris,
 	int* tri_data, int shader, struct GameData* data)
 ;
+void update_custom_mesh_from_memory(int mesh, int num_verts, int num_tris,
+    int* tri_data, int num_data_specs, struct GraphicsValueSpec* data_spec, struct GameData* data)
+;
 void unload_mesh(int mesh, struct GameData* data)
 ;
 void create_sprite_atlas(struct GameData* data)
@@ -210,6 +225,8 @@ void frame_data_clear(struct FrameData* frame_data, struct Color col)
 ;
 void frame_data_set_draw_order(struct FrameData* frame_data, int front_to_back)
 ;
+void frame_data_set_viewport_3d(struct FrameData *frame_data, struct RenderRect rect)
+;
 void add_frame_data(struct FrameData* frame_data, struct GameData* data)
 ;
 struct FrameData *get_active_frame_data(struct GameData *data)
@@ -228,18 +245,6 @@ int was_key_typed(unsigned int key, struct InputState *input_state);
 int is_key_down(int key);
 
 float sum_values(float *values, int num);
-
-struct RenderCoord {
-    union {
-        float c[2];
-        struct {
-            float x, y;
-        };
-    };
-};
-struct RenderRect {
-	struct RenderCoord p[2];
-};
 
 
 
@@ -402,7 +407,7 @@ void point_coords_in_rect(struct RenderCoord point, struct RenderRect rect, floa
 ;
 int is_point_in_rect(struct RenderCoord point, struct RenderRect rect)
 ;
-struct Matrix3 get_rect_matrix3(struct RenderRect rect, struct RenderContext *context)
+struct Matrix3 get_rect_matrix3(struct RenderRect rect)
 ;
 struct Matrix4 get_rect_matrix4(struct RenderRect rect, float z, struct RenderContext *context)
 ;

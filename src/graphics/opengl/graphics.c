@@ -1,4 +1,4 @@
-#include <stdlib.h>
+﻿#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -8,14 +8,18 @@
 
 #define SATIN_SHADER_SUFFIX ""
 #ifdef _WIN32
-	#include "opengl/opengl.h"
 #endif
 #ifdef __APPLE__
     #include "TargetConditionals.h"
 	#include "opengl/opengl.h"
 #endif
+#include "opengl/opengl.h"
 
-static const char *glsl_version_string = "#version 330\n";
+#ifdef EMSCRIPTEN
+    static const char *glsl_version_string = "#version 100\n";
+#else
+    static const char *glsl_version_string = "#version 330\n";
+#endif
 
 struct GraphicsData
 {
@@ -156,8 +160,8 @@ void graphics_render_mesh(struct Mesh *mesh, struct Shader *shader,
             loc=glGetUniformLocation(shader_handle,u.name);
         }
         if(loc == -1){
-            printf("Warning: Could not find \"%s\" uniform in shader (%s,%s)\n",
-                u.name, shader->vert_filename, shader->frag_filename);
+            //printf("Warning: Could not find \"%s\" uniform in shader (%s,%s)\n",
+                //u.name, shader->vert_filename, shader->frag_filename);
         }else{
             switch(u.type){
                 case GRAPHICS_VALUE_INT:
@@ -247,13 +251,10 @@ struct Shader *graphics_compile_shader(const char *vert_filename, const char *fr
     enum GraphicsBlendMode blend_mode, char *error_buffer, int error_buffer_len, struct GraphicsData *graphics,
     struct WindowData *window_data)
 {
-    const char *version_string = "#version 330\n";
-    
     struct Shader *shader = calloc(1,sizeof(struct Shader));
     shader->vert_filename = strdup(vert_filename);
     shader->frag_filename = strdup(frag_filename);
 
-    printf("Compile shader %s %s\n", vert_filename, frag_filename);
     FILE *vert_fp = open_file(vert_filename, "vert", "rt", window_get_os_data(window_data));
     if(vert_fp){
         FILE *frag_fp = open_file(frag_filename, "frag", "rt", window_get_os_data(window_data));
@@ -272,8 +273,8 @@ struct Shader *graphics_compile_shader(const char *vert_filename, const char *fr
             int shader_handle=glCreateProgram();
             int vert_handle=glCreateShader(GL_VERTEX_SHADER);
             int frag_handle=glCreateShader(GL_FRAGMENT_SHADER);
-            const char *vert_char[2] = {version_string,vert_source};
-            const char *frag_char[2] = {version_string,frag_source};
+            const char *vert_char[2] = {glsl_version_string,vert_source};
+            const char *frag_char[2] = {glsl_version_string,frag_source};
             glShaderSource(vert_handle,2,vert_char,0);
             glShaderSource(frag_handle,2,frag_char,0);
             glCompileShader(vert_handle);
@@ -315,7 +316,9 @@ struct Shader *graphics_compile_shader(const char *vert_filename, const char *fr
             for (int i = 0; i < num_uniforms; i++) {
                 GLsizei name_length;
                 char* uniform_name = uniform_names + i * max_uniform_name_length;
-                glGetActiveUniformName(shader_handle, i, max_uniform_name_length, &name_length, uniform_name);
+                //glGetActiveUniformName(shader_handle, i, max_uniform_name_length, &name_length, uniform_name);
+                int size, type;
+                glGetActiveUniform(shader_handle, i, max_uniform_name_length, &name_length, &size, &type, uniform_name); 
                 uniform_locations[i] = glGetUniformLocation(shader_handle, uniform_name);
                 //For some reason, arrays are reported with [0] at the end. We want to remove that so that we can match without it later
                 for (int j = 0; j < name_length; j++) {
@@ -356,7 +359,7 @@ struct Mesh *graphics_create_mesh(struct GraphicsValueSpec *value_specs, uint32_
         glBindBuffer(GL_ARRAY_BUFFER,mesh->vertex_buffers[i]);
     
         glBufferData(GL_ARRAY_BUFFER,graphics_value_sizes[spec.type]*num_verts
-            ,spec.data, GL_DYNAMIC_DRAW);
+            ,spec.data, GL_STATIC_DRAW);
 
 		glEnableVertexAttribArray(i);
 		glVertexAttribPointer(i,graphics_value_nums[spec.type],
@@ -378,6 +381,8 @@ void graphics_update_mesh(struct Mesh* mesh, struct GraphicsValueSpec* value_spe
 {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
     if (mesh->num_indices == num_indices) {
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, num_indices * sizeof(int), index_data);
+        /*
         unsigned char* buffer = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
         if (buffer) {
             memcpy(buffer, index_data, num_indices * sizeof(int));
@@ -390,6 +395,7 @@ void graphics_update_mesh(struct Mesh* mesh, struct GraphicsValueSpec* value_spe
                 printf("OpenGL error %d\n", err);
             }
         }
+        */
     } else {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER,num_indices*sizeof(int),index_data,
                      GL_STATIC_DRAW);
@@ -403,8 +409,8 @@ void graphics_update_mesh(struct Mesh* mesh, struct GraphicsValueSpec* value_spe
         for(int i=0;i< num_value_specs; i++){
             struct GraphicsValueSpec spec = value_specs[i];
             glBindBuffer(GL_ARRAY_BUFFER,mesh->vertex_buffers[i]);
-            glBufferData(GL_ARRAY_BUFFER,graphics_value_sizes[spec.type]*num_verts
-                ,spec.data, GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, graphics_value_sizes[spec.type]*num_verts
+                ,spec.data, GL_STATIC_DRAW);
             glVertexAttribPointer(i,graphics_value_nums[spec.type],
                 graphics_value_opengl_types[spec.type],GL_FALSE,
                 0, 0);
@@ -418,10 +424,12 @@ void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t 
     int num_verts = mesh->num_verts;
     for (int i = 0; i < num_value_specs; i++) {
         glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffers[i]);
+			struct GraphicsValueSpec spec = value_specs[i];
+        int data_len = graphics_value_sizes[spec.type] * num_verts;
+        glBufferSubData(GL_ARRAY_BUFFER, 0, data_len, spec.data);
+        /*
         unsigned char* buffer = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
         if (buffer) {
-			struct GraphicsValueSpec spec = value_specs[i];
-			int data_len = graphics_value_sizes[spec.type] * num_verts;
 			memcpy(buffer, spec.data, data_len);
             glUnmapBuffer(GL_ARRAY_BUFFER);
         }
@@ -432,6 +440,7 @@ void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t 
                 printf("OpenGL error %d\n", err);
             }
         }
+        */
     }
 }
 
@@ -457,7 +466,6 @@ struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint3
     texture->gl_format = gl_format;
     glTexImage2D(GL_TEXTURE_2D, 0,gl_format, w, h,
         0, gl_format, GL_UNSIGNED_BYTE, texture_data);
-    printf("Loaded texture!\n");
     return texture;
 }
 
