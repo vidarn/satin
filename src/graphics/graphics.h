@@ -10,6 +10,8 @@ struct Mesh
 ;
 struct Texture
 ;
+struct Framebuffer
+;
 struct RenderPass
 ;
 
@@ -86,8 +88,17 @@ void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t 
 
 struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint32_t h, uint32_t format, struct GraphicsData *graphics)
 ;
+void graphics_reformat_texture(struct Texture *texture, uint8_t *texture_data, uint32_t w, uint32_t h, uint32_t format, struct GraphicsData *graphics)
+;
 void graphics_update_texture(struct Texture *tex, uint8_t *texture_data,
     uint32_t x, uint32_t y, uint32_t w, uint32_t h, struct GraphicsData *graphics)
+;
+
+struct Framebuffer* graphics_create_framebuffer()
+;
+void graphics_end_render_to_texture()
+;
+void graphics_begin_render_to_texture(struct Texture* texture, struct Framebuffer* framebuffer)
 ;
 
 void graphics_set_scissor_state(int enabled, int x1, int y1, int x2, int y2)

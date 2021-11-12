@@ -496,6 +496,16 @@ void render_rect(struct RenderRect rect, struct RenderCoord thickness,
 void render_rect_fill(struct RenderRect rect,
 	float *color, struct RenderContext* context)
 {
+	struct GraphicsValueSpec uniforms[] = {
+        {"color", color, GRAPHICS_VALUE_VEC4, 1},
+	};
+	int num_uniforms = sizeof(uniforms) / sizeof(*uniforms);
+    render_rect_shaded(rect, context->data->fill_shader, uniforms, num_uniforms, context);
+}
+
+void render_rect_shaded(struct RenderRect rect, int shader, struct GraphicsValueSpec* uniforms,
+    int num_uniforms, struct RenderContext* context)
+{
     struct RenderCoord res;
     window_get_res(&res.x, &res.y, get_window_data(context->data));
 
@@ -506,11 +516,7 @@ void render_rect_fill(struct RenderRect rect,
 		0, p2.y -p1.y, 0.f,
 		p1.x, p1.y, 1.0f,
 	};
-	struct GraphicsValueSpec uniforms[] = {
-        {"color", color, GRAPHICS_VALUE_VEC4, 1},
-	};
-	int num_uniforms = sizeof(uniforms) / sizeof(*uniforms);
-	render_quad(context->data->fill_shader, m, uniforms, num_uniforms, context);
+	render_quad(shader, m, uniforms, num_uniforms, context);
 }
 
 struct RenderCoord render_char(int char_index, int font_id, struct RenderCoord p,

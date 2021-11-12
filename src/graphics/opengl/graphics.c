@@ -50,10 +50,16 @@ struct Mesh
     int num_vertex_buffers;
 };
 
+struct Framebuffer
+{
+    unsigned int handle;
+};
+
 struct Texture
 {
     unsigned int handle;
 	GLenum gl_format;
+    int w, h;
 };
 
 int graphics_value_sizes[] = {
@@ -102,6 +108,36 @@ void graphics_begin_render_pass(float *clear_rgba, struct GraphicsData *graphics
 
 void graphics_end_render_pass(struct GraphicsData *graphics)
 {
+}
+
+void graphics_begin_render_to_texture(struct Texture *texture, struct Framebuffer *framebuffer)
+{
+    // Bind the framebuffer and the texture associated with the texture.
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->handle);
+    glBindTexture(GL_TEXTURE_2D, texture->handle); // TODO: Is this needed, does the framebuffer remeber the bound texture?
+    glEnable(GL_DEPTH_TEST);
+
+    // Clear texture
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture->w, texture->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture->handle, 0);
+
+    GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+    glDrawBuffers(sizeof(DrawBuffers)/sizeof(*DrawBuffers), DrawBuffers);
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+        assert(0);
+        printf("Error creating frame buffer!\n");
+        return;
+    }
+
+}
+
+void graphics_end_render_to_texture()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void graphics_clear(struct GraphicsData *graphics)
@@ -444,10 +480,23 @@ void graphics_update_mesh_verts(struct GraphicsValueSpec* value_specs, uint32_t 
     }
 }
 
+struct Framebuffer* graphics_create_framebuffer()
+{
+    struct Framebuffer *framebuffer = calloc(1,sizeof(struct Framebuffer));
+    glGenFramebuffers(1, &framebuffer->handle);
+    return framebuffer;
+}
+
 struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint32_t h, uint32_t format, struct GraphicsData *graphics)
 {
     struct Texture *texture = calloc(1,sizeof(struct Texture));
 	glGenTextures(1, &texture->handle);
+    graphics_reformat_texture(texture, texture_data, w, h, format, graphics);
+    return texture;
+}
+
+void graphics_reformat_texture(struct Texture* texture, uint8_t *texture_data,
+    uint32_t w, uint32_t h, uint32_t format, struct GraphicsData* graphics) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture->handle);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -464,9 +513,10 @@ struct Texture *graphics_create_texture(uint8_t *texture_data, uint32_t w, uint3
 		break;
 	}
     texture->gl_format = gl_format;
+    texture->w = w;
+    texture->h = h;
     glTexImage2D(GL_TEXTURE_2D, 0,gl_format, w, h,
         0, gl_format, GL_UNSIGNED_BYTE, texture_data);
-    return texture;
 }
 
 void graphics_update_texture(struct Texture* tex, uint8_t* texture_data,

@@ -393,6 +393,9 @@ void render_rect(struct RenderRect rect, struct RenderCoord thickness,
 void render_rect_fill(struct RenderRect rect,
 	float *color, struct RenderContext* context)
 ;
+void render_rect_shaded(struct RenderRect rect, int shader, struct GraphicsValueSpec *uniforms,
+    int num_uniforms, struct RenderContext *context)
+;
 struct RenderCoord render_string_n(const char *string, int n, int font, struct RenderCoord p,
 	float *color, struct RenderContext *context)
 ;
