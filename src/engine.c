@@ -1149,7 +1149,8 @@ void *load_mesh_to_memory(const char *name,
         free(vert_to_unique_vert);
         
         if(no_normals){
-            calculate_mesh_normals(num_verts, vertex_data, normal_data, num_tris, index_data);
+            calculate_mesh_normals(num_verts, (struct Vec3*)vertex_data,
+                    (struct Vec3*)normal_data, num_tris, index_data);
         }
         
         *num_verts_out = num_verts;

@@ -1,5 +1,5 @@
 #include "engine.h"
-#include "opengl.h"
+#include "opengl/opengl.h"
 #include "os/os.h"
 #include <Windows.h>
 #include <Xinput.h>
@@ -31,7 +31,7 @@ struct WindowProcParams {
 static LONG WINAPI
 WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	struct WindowProcParams *params = GetWindowLongPtr(hWnd, GWLP_USERDATA);
+	struct WindowProcParams *params = (struct WindowProcParams*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
 
 	switch (uMsg) {
 	case WM_SIZE:
@@ -129,7 +129,7 @@ CreateOpenGLWindow(const char* title, int x, int y, struct WindowProcParams *win
 	hWnd = CreateWindowA("Satin", title, style,
 		x, y, window_proc_params->framebuffer_w, window_proc_params->framebuffer_h, parent_hWnd, NULL, hInstance, NULL);
 
-	SetWindowLongPtr(hWnd, GWLP_USERDATA, window_proc_params);
+	SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)window_proc_params);
 
 	if (hWnd == NULL) {
 		MessageBoxA(NULL, "CreateWindow() failed:  Cannot create a window.",

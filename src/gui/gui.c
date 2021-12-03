@@ -401,14 +401,14 @@ int gui_button(struct RenderRect button_rect, const char* caption, struct GuiCon
 {
 	int ret = 0;
 	float* col = context->button_col;
-	if (is_point_in_rect(context->mp,button_rect,context->render_context)) {
+	if (is_point_in_rect(context->mp,button_rect)) {
 		col = context->button_hover_col;
 		if (context->input.mouse_state == MOUSE_CLICKED) {
 			ret = 1;
 		}
 	}
 	render_rect_fill(button_rect, col, context->render_context);
-	render_rect(button_rect, cp(1.f, 0.f, get_window_data(context->data)), context->border_col, context->render_context);
+	render_rect(button_rect, cp(1.f, 0.f), context->border_col, context->render_context);
 	if (caption) {
 		//TODO(Vidar):Functions for getting different parts of a rect
         /*
