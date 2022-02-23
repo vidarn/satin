@@ -1,6 +1,7 @@
 #include "engine.h"
 #include "opengl/opengl.h"
 #include "os/os.h"
+#include "window/window.h"
 #include <Windows.h>
 #include <Xinput.h>
 #include <stdio.h>
@@ -11,12 +12,25 @@ float controller_right_thumb_deadzone = (float)XINPUT_GAMEPAD_RIGHT_THUMB_DEADZO
 struct WindowData {
 	struct OSData* os_data;
 	struct GraphicsData* graphics_data;
+	struct WindowProcParams* window_proc_params;
+	struct InputState *input_state;
+	struct OpenGLFuncPointers *opengl_func_ptrs;
 	HWND hWnd;
 	HWND parent_hWnd;
 	HICON icon;
+	HANDLE timer;
+	HGLRC hRC;
+	HDC hDC;
+    LARGE_INTEGER counter_frequency;
+	LARGE_INTEGER timer_interval;
+	LARGE_INTEGER last_tick;
+	long int drag_start_x;
+	long int drag_start_y;
 	float min_x, max_x, min_y, max_y;
 	int framebuffer_w;
 	int framebuffer_h;
+	int wait_for_event;
+	int cursor_visible;
 };
 
 struct WindowProcParams {
@@ -168,28 +182,43 @@ CreateOpenGLWindow(const char* title, int x, int y, struct WindowProcParams *win
 	return hWnd;
 }
 
-LARGE_INTEGER counter_frequency;
 uint64_t window_get_current_tick(struct WindowData *window_data)
 {
     LARGE_INTEGER current_tick;
     QueryPerformanceCounter(&current_tick);
     current_tick.QuadPart*=TICKS_PER_SECOND;
-    current_tick.QuadPart/=counter_frequency.QuadPart;
+    current_tick.QuadPart/=window_data->counter_frequency.QuadPart;
     return (int)current_tick.QuadPart;
 }
 
 void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_h, int show_console,
 	int num_game_states, void* param, struct GameState* game_states, int debug_mode, struct OSData* os_data)
 {
-	struct InputState input_state = { 0 };
-	struct WindowProcParams window_proc_params = { 0 };
-	window_proc_params.input_state = &input_state;
-	window_proc_params.framebuffer_w = _framebuffer_w;
-	window_proc_params.framebuffer_h = _framebuffer_h;
-	window_proc_params.window_active = 1;
+	struct GameData* game_data = window_start_game((struct WindowStartGameParams){ window_title, _framebuffer_w, _framebuffer_h, show_console, num_game_states, param, game_states, debug_mode, os_data });
+	int should_quit = 0;
+	while (!should_quit) {
+		should_quit = window_step_game(game_data);
+	}
+	window_end_game(game_data);
+}
+
+struct GameData *window_start_game(struct WindowStartGameParams params)
+{
+	if (params.game_data) {
+        struct WindowData* window_data = get_window_data(params.game_data);
+        opengl_activate(window_data->opengl_func_ptrs);
+		reinit_game_states(params.num_game_states, params.game_states, params.game_data);
+		return params.game_data;
+	}
+	struct InputState* input_state = calloc(1, sizeof(struct InputState));
+	struct WindowProcParams* window_proc_params = calloc(1, sizeof(struct WindowProcParams));
+	window_proc_params->input_state = input_state;
+	window_proc_params->framebuffer_w = params._framebuffer_w;
+	window_proc_params->framebuffer_h = params._framebuffer_h;
+	window_proc_params->window_active = 1;
 	OutputDebugStringA("Launching game!\n");
 
-	if (show_console) {
+	if (params.show_console) {
 		AllocConsole();
 		freopen("CONIN$", "r", stdin);
 		freopen("CONOUT$", "w", stdout);
@@ -200,15 +229,10 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 	HGLRC hRC_tmp;				/* opengl context */
 	HGLRC hRC;				/* opengl context */
 	HWND  hWnd;				/* window */
-	MSG   msg;				/* message */
 
-	hWnd = CreateOpenGLWindow(window_title, 0, 0, &window_proc_params, PFD_TYPE_RGBA, 0,
-		/* TODO(Vidar):Reimplement this
-		window_data->parent_hWnd,
-		window_data->icon);
-		*/
-		0,0
-		);
+	hWnd = CreateOpenGLWindow(params.window_title, 0, 0, window_proc_params, PFD_TYPE_RGBA, 0,
+		0, 0
+	);
 	if (hWnd == NULL)
 		exit(1);
 
@@ -216,17 +240,7 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 	hRC_tmp = wglCreateContext(hDC);
 	wglMakeCurrent(hDC, hRC_tmp);
 
-	opengl_load();
-
-	/*
-	GLenum err = glewInit();
-	if (GLEW_OK != err) {
-		OutputDebugStringA("Error: \n");
-		MessageBoxA(NULL, "GLEW error"
-			"Could not initialize", "Error", MB_OK);
-		return;
-	}
-	*/
+	struct OpenGLFuncPointers *opengl_func_ptrs = opengl_load();
 
 	int attribs[] =
 	{
@@ -235,7 +249,7 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 		WGL_CONTEXT_FLAGS_ARB, 0,
 		0
 	};
-	if (debug_mode) {
+	if (params.debug_mode) {
 		attribs[2] |= WGL_CONTEXT_DEBUG_BIT_ARB;
 	}
 	hRC = wglCreateContextAttribsARB(hDC, 0, attribs);
@@ -243,7 +257,7 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 	wglDeleteContext(hRC_tmp);
 	wglMakeCurrent(hDC, hRC);
 
-	if (debug_mode) {
+	if (params.debug_mode) {
 		glEnable(GL_DEBUG_OUTPUT);
 	}
 
@@ -253,336 +267,323 @@ void launch_game(const char* window_title, int _framebuffer_w, int _framebuffer_
 	OutputDebugStringA("\n");
 
 	ShowWindow(hWnd, SW_SHOW);
-	
+
 	struct WindowData* window_data = calloc(1, sizeof(struct WindowData));
+	window_data->hDC = hDC;
+	window_data->hRC = hRC;
 	window_data->hWnd = hWnd;
+	window_data->opengl_func_ptrs = opengl_func_ptrs;
+	window_data->input_state = input_state;
+	window_data->window_proc_params = window_proc_params;
+	struct OSData* os_data = params.os_data;
 	if (!os_data) {
 		os_data = os_data_create();
 	}
-    window_data->os_data = os_data;
-    struct GraphicsData *graphics = graphics_create(0);
-    window_data->graphics_data = graphics;
+	window_data->os_data = os_data;
+	struct GraphicsData* graphics = graphics_create(0);
+	window_data->graphics_data = graphics;
 
-	struct GameData* game_data = init(num_game_states, game_states, param, window_data, debug_mode);
+	struct GameData* game_data = init(params.num_game_states, params.game_states, params.param, window_data, params.debug_mode);
 
-	HANDLE timer = CreateWaitableTimerA(NULL, TRUE, "Engine FPS timer");
-	if (!timer) {
+	window_data->timer = CreateWaitableTimerA(NULL, TRUE, "Satin FPS timer");
+	if (!window_data->timer) {
 		MessageBoxA(hWnd, "Could not create multimedia timer", "Error!", MB_OK | MB_ICONERROR);
 	}
-	LARGE_INTEGER timer_interval;
-	timer_interval.QuadPart = -1e7 / 60;
-	SetWaitableTimer(timer, &timer_interval, 0, 0, 0, FALSE);
+	window_data->timer_interval.QuadPart = -1e7 / 60;
+	SetWaitableTimer(window_data->timer, &window_data->timer_interval, 0, 0, 0, FALSE);
 
-	LARGE_INTEGER last_tick;
-	QueryPerformanceCounter(&last_tick);
-	QueryPerformanceFrequency(&counter_frequency);
-	long int drag_start_x = 0;
-	long int drag_start_y = 0;
-	int cursor_visible = 1;
-	int wait_for_event = 0;
-	while (!window_proc_params.should_quit) {
-		int event_recieved;
-		if ((event_recieved = PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE)) || wait_for_event) {
-			wait_for_event = 0;
-			if (!event_recieved) {
-				GetMessageA(&msg, hWnd, 0, 0);
-			}
-			switch (msg.message) {
-			case WM_CHAR:
-			{
-				/*
-				OutputDebugStringA("Key input: ");
-				char c[2] = { 0 };
-				c[0] = (char)msg.wParam;
-				OutputDebugStringA(c);
-				OutputDebugStringA("\n");
-				*/
-				if (input_state.num_keys_typed < max_num_keys_typed) {
-					input_state.keys_typed[input_state.num_keys_typed] = msg.wParam;
-					input_state.num_keys_typed++;
-				}
-				break;
-			}
-			case WM_KEYDOWN:
-			{
-				int handled = 0;
-				if (input_state.num_keys_typed < max_num_keys_typed) {
-					int ok = 0;
-					switch (msg.wParam)
-					{
-					case VK_LEFT:
-						ok = 1; break;
-					case VK_RIGHT:
-						ok = 1; break;
-					}
-					if (ok) {
-						input_state.keys_typed[input_state.num_keys_typed] = msg.wParam;
-						input_state.num_keys_typed++;
-						handled = 1;
-					}
-				}
-				if (!handled) {
-					TranslateMessage(&msg);
-					DispatchMessage(&msg);
-				}
-				break;
-			}
-			case WM_RBUTTONDOWN:
-			{
-				input_state.mouse_state_right = MOUSE_CLICKED;
-				input_state.mouse_down_right = 1;
-				POINT p;
-				GetCursorPos(&p);
-				ScreenToClient(hWnd, &p);
-				drag_start_x = p.x;
-				drag_start_y = p.y;
-				break;
-			}
-			case WM_RBUTTONUP:
-			{
-				input_state.mouse_down_right = 0;
-				input_state.mouse_state_right = MOUSE_NOTHING;
-				break;
-			}
-			case WM_LBUTTONDOWN:
-			{
-				input_state.mouse_state = MOUSE_CLICKED;
-				input_state.mouse_down = 1;
-				POINT p;
-				GetCursorPos(&p);
-				ScreenToClient(hWnd, &p);
-				drag_start_x = p.x;
-				drag_start_y = p.y;
-				window_proc_params.window_active = 1;
-				break;
-			}
-			case WM_LBUTTONUP:
-			{
-				input_state.mouse_down = 0;
-				input_state.mouse_state = MOUSE_NOTHING;
-				if (input_state.prev_mouse_state == MOUSE_DRAG) {
-					//ClipCursor(NULL); 
-					ReleaseCapture(); 
-				}
-				break;
-			}
-			case WM_MBUTTONDOWN:
-			{
-				input_state.mouse_state_middle = MOUSE_CLICKED;
-				input_state.mouse_down_middle = 1;
-				POINT p;
-				GetCursorPos(&p);
-				ScreenToClient(hWnd, &p);
-				drag_start_x = p.x;
-				drag_start_y = p.y;
-				break;
-			}
-			case WM_MBUTTONUP:
-			{
-				input_state.mouse_down_middle = 0;
-				input_state.mouse_state_middle = MOUSE_NOTHING;
-				break;
-			}
-			case WM_MOUSEWHEEL:
-			{
-				input_state.scroll_delta.y = (float)GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120.f;
-				break;
-			}
-			default:
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-				break;
-			}
-		}
-		else {
-			WaitForSingleObject(timer, INFINITE);
-			SetWaitableTimer(timer, &timer_interval, 0, 0, 0, FALSE);
-			POINT p;
-			GetCursorPos(&p);
-			ScreenToClient(hWnd, &p);
-			RECT r;
-			GetClientRect(hWnd, &r);
-			float p_x = p.x - (float)r.left;
-			float p_y = p.y - (float)r.top;
-			float drag_x = drag_start_x - r.left;
-			float drag_y = drag_start_y - r.top;
-			float w = r.right - r.left;
-			float h = r.bottom - r.top;
-			float m_x;
-			float m_y;
-			float d_x;
-			float d_y;
-			m_x = p_x;
-			m_y = h - p_y;
-			d_x = drag_x;
-			d_y = h - drag_y;
-			/*
-			if (w < h) {
-				m_x = p_x / w;
-				m_y = 1.f - (p_y / w - 0.5 * (h - w) / w);
-				d_x = drag_x / w;
-				d_y = 1.f - (drag_y / w - 0.5 * (h - w) / w);
-			}
-			else {
-				m_x = p_x / h - 0.5f * (w - h) / h;
-				m_y = 1.f - p_y / h;
-				d_x = drag_x / h - 0.5f * (w - h) / h;
-				d_y = 1.f - drag_y / h;
-			}
-			*/
-			input_state.delta.x = m_x - input_state.mouse_p.x;
-			input_state.delta.y = m_y - input_state.mouse_p.y;
-			if (cursor_locked(game_data)) {
-				float offset_x = d_x - m_x;
-				float offset_y = d_y - m_y;
-				m_x += offset_x;
-				m_y += offset_y;
-				d_x += offset_x;
-				d_y += offset_y;
+	QueryPerformanceCounter(&window_data->last_tick);
+	QueryPerformanceFrequency(&window_data->counter_frequency);
+	return game_data;
+}
 
-				POINT tmp_p = { drag_start_x, drag_start_y };
-				if (cursor_visible) {
-					while (ShowCursor(FALSE) >= 0) {}
-				}
-				cursor_visible = 0;
-				ClientToScreen(hWnd, &tmp_p);
-				SetCursorPos(tmp_p.x, tmp_p.y);
-			}
-			else {
-				if (!cursor_visible) {
-					while (ShowCursor(TRUE) < 0) {}
-				}
-				cursor_visible = 1;
-			}
-			input_state.mouse_p.x = m_x;
-			input_state.mouse_p.y = m_y;
-			input_state.drag_start.x = d_x;
-			input_state.drag_start.y = d_y;
+int window_step_game(struct GameData *game_data)
+{
+	MSG   msg;
+    int event_recieved;
+	struct WindowData* window_data = get_window_data(game_data);
+	struct InputState* input_state = window_data->input_state;
+    if ((event_recieved = PeekMessage(&msg, window_data->hWnd, 0, 0, PM_REMOVE)) || window_data->wait_for_event) {
+        window_data->wait_for_event = 0;
+        if (!event_recieved) {
+            GetMessageA(&msg, window_data->hWnd, 0, 0);
+        }
+        switch (msg.message) {
+        case WM_CHAR:
+        {
+            if (input_state->num_keys_typed < max_num_keys_typed) {
+                input_state->keys_typed[input_state->num_keys_typed] = msg.wParam;
+                input_state->num_keys_typed++;
+            }
+            break;
+        }
+        case WM_KEYDOWN:
+        {
+            int handled = 0;
+            if (input_state->num_keys_typed < max_num_keys_typed) {
+                int ok = 0;
+                switch (msg.wParam)
+                {
+                case VK_LEFT:
+                    ok = 1; break;
+                case VK_RIGHT:
+                    ok = 1; break;
+                }
+                if (ok) {
+                    input_state->keys_typed[input_state->num_keys_typed] = msg.wParam;
+                    input_state->num_keys_typed++;
+                    handled = 1;
+                }
+            }
+            if (!handled) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+            break;
+        }
+        case WM_RBUTTONDOWN:
+        {
+            input_state->mouse_state_right = MOUSE_CLICKED;
+            input_state->mouse_down_right = 1;
+            POINT p;
+            GetCursorPos(&p);
+            ScreenToClient(window_data->hWnd, &p);
+            window_data->drag_start_x = p.x;
+            window_data->drag_start_y = p.y;
+            break;
+        }
+        case WM_RBUTTONUP:
+        {
+            input_state->mouse_down_right = 0;
+            input_state->mouse_state_right = MOUSE_NOTHING;
+            break;
+        }
+        case WM_LBUTTONDOWN:
+        {
+            input_state->mouse_state = MOUSE_CLICKED;
+            input_state->mouse_down = 1;
+            POINT p;
+            GetCursorPos(&p);
+            ScreenToClient(window_data->hWnd, &p);
+            window_data->drag_start_x = p.x;
+            window_data->drag_start_y = p.y;
+            window_data->window_proc_params->window_active = 1;
+            break;
+        }
+        case WM_LBUTTONUP:
+        {
+            input_state->mouse_down = 0;
+            input_state->mouse_state = MOUSE_NOTHING;
+            if (input_state->prev_mouse_state == MOUSE_DRAG) {
+                //ClipCursor(NULL); 
+                ReleaseCapture(); 
+            }
+            break;
+        }
+        case WM_MBUTTONDOWN:
+        {
+            input_state->mouse_state_middle = MOUSE_CLICKED;
+            input_state->mouse_down_middle = 1;
+            POINT p;
+            GetCursorPos(&p);
+            ScreenToClient(window_data->hWnd, &p);
+            window_data->drag_start_x = p.x;
+            window_data->drag_start_y = p.y;
+            break;
+        }
+        case WM_MBUTTONUP:
+        {
+            input_state->mouse_down_middle = 0;
+            input_state->mouse_state_middle = MOUSE_NOTHING;
+            break;
+        }
+        case WM_MOUSEWHEEL:
+        {
+            input_state->scroll_delta.y = (float)GET_WHEEL_DELTA_WPARAM(msg.wParam) / 120.f;
+            break;
+        }
+        default:
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+            break;
+        }
+    }
+    else {
+        WaitForSingleObject(window_data->timer, INFINITE);
+        SetWaitableTimer(window_data->timer, &window_data->timer_interval, 0, 0, 0, FALSE);
+        POINT p;
+        GetCursorPos(&p);
+        ScreenToClient(window_data->hWnd, &p);
+        RECT r;
+        GetClientRect(window_data->hWnd, &r);
+        float p_x = p.x - (float)r.left;
+        float p_y = p.y - (float)r.top;
+        float drag_x = window_data->drag_start_x - r.left;
+        float drag_y = window_data->drag_start_y - r.top;
+        float w = r.right - r.left;
+        float h = r.bottom - r.top;
+        float m_x;
+        float m_y;
+        float d_x;
+        float d_y;
+        m_x = p_x;
+        m_y = h - p_y;
+        d_x = drag_x;
+        d_y = h - drag_y;
+        input_state->delta.x = m_x - input_state->mouse_p.x;
+        input_state->delta.y = m_y - input_state->mouse_p.y;
+        if (cursor_locked(game_data)) {
+            float offset_x = d_x - m_x;
+            float offset_y = d_y - m_y;
+            m_x += offset_x;
+            m_y += offset_y;
+            d_x += offset_x;
+            d_y += offset_y;
 
-			for (int i_controller = 0; i_controller < max_num_controllers; i_controller++) {
-				XINPUT_STATE xinput_state = { 0 };
-				DWORD result = XInputGetState(i_controller, &xinput_state);
-				if (result == ERROR_SUCCESS) {
-					input_state.controllers[i_controller].valid = 1;
-					input_state.controllers[i_controller].buttons_pressed = xinput_state.Gamepad.wButtons;
-					input_state.controllers[i_controller].left_trigger = (float)xinput_state.Gamepad.bLeftTrigger / 255.f;
-					input_state.controllers[i_controller].right_trigger = (float)xinput_state.Gamepad.bRightTrigger / 255.f;
-					input_state.controllers[i_controller].left_thumb[0] = (float)xinput_state.Gamepad.sThumbLX / 32768.f;
-					input_state.controllers[i_controller].left_thumb[1] = (float)xinput_state.Gamepad.sThumbLY / 32768.f;
-					input_state.controllers[i_controller].right_thumb[0] = (float)xinput_state.Gamepad.sThumbRX / 32768.f;
-					input_state.controllers[i_controller].right_thumb[1] = (float)xinput_state.Gamepad.sThumbRY / 32768.f;
-				}
-				else {
-					memset(input_state.controllers + i_controller, 0, sizeof(struct ControllerState));
-				}
-			}
+            POINT tmp_p = { window_data->drag_start_x, window_data->drag_start_y };
+            if (window_data->cursor_visible) {
+                while (ShowCursor(FALSE) >= 0) {}
+            }
+            window_data->cursor_visible = 0;
+            ClientToScreen(window_data->hWnd, &tmp_p);
+            SetCursorPos(tmp_p.x, tmp_p.y);
+        }
+        else {
+            if (!window_data->cursor_visible) {
+                while (ShowCursor(TRUE) < 0) {}
+            }
+            window_data->cursor_visible = 1;
+        }
+        input_state->mouse_p.x = m_x;
+        input_state->mouse_p.y = m_y;
+        input_state->drag_start.x = d_x;
+        input_state->drag_start.y = d_y;
 
-			if (!window_proc_params.window_active && input_state.mouse_down) {
-				input_state.mouse_down = 0;
-				input_state.mouse_state = MOUSE_NOTHING;
-				if (input_state.prev_mouse_state == MOUSE_DRAG) {
-					//ClipCursor(NULL);
-					ReleaseCapture();
-				}
-			}
+        for (int i_controller = 0; i_controller < max_num_controllers; i_controller++) {
+            XINPUT_STATE xinput_state = { 0 };
+            DWORD result = XInputGetState(i_controller, &xinput_state);
+            if (result == ERROR_SUCCESS) {
+                input_state->controllers[i_controller].valid = 1;
+                input_state->controllers[i_controller].buttons_pressed = xinput_state.Gamepad.wButtons;
+                input_state->controllers[i_controller].left_trigger = (float)xinput_state.Gamepad.bLeftTrigger / 255.f;
+                input_state->controllers[i_controller].right_trigger = (float)xinput_state.Gamepad.bRightTrigger / 255.f;
+                input_state->controllers[i_controller].left_thumb[0] = (float)xinput_state.Gamepad.sThumbLX / 32768.f;
+                input_state->controllers[i_controller].left_thumb[1] = (float)xinput_state.Gamepad.sThumbLY / 32768.f;
+                input_state->controllers[i_controller].right_thumb[0] = (float)xinput_state.Gamepad.sThumbRX / 32768.f;
+                input_state->controllers[i_controller].right_thumb[1] = (float)xinput_state.Gamepad.sThumbRY / 32768.f;
+            }
+            else {
+                memset(input_state->controllers + i_controller, 0, sizeof(struct ControllerState));
+            }
+        }
+
+        if (!window_data->window_proc_params->window_active && input_state->mouse_down) {
+            input_state->mouse_down = 0;
+            input_state->mouse_state = MOUSE_NOTHING;
+            if (input_state->prev_mouse_state == MOUSE_DRAG) {
+                //ClipCursor(NULL);
+                ReleaseCapture();
+            }
+        }
 
 
-			if (input_state.mouse_down || input_state.mouse_down_right || input_state.mouse_down_middle)
-			{
-				float dx = fabsf(input_state.drag_start.x - input_state.mouse_p.x);
-				float dy = fabsf(input_state.drag_start.y - input_state.mouse_p.y);
-				//printf("%f %f, %f %f\n",input_state.mouse_x,input_state.mouse_y,input_state.drag_start_x,input_state.drag_start_y);
-				float drag_dx = fabsf((float)GetSystemMetrics(SM_CXDRAG) / (float)(r.right - r.left));
-				float drag_dy = fabsf((float)GetSystemMetrics(SM_CYDRAG) / (float)(r.top - r.bottom));
-				if (dx > drag_dx || dy > drag_dy) {
-					if (input_state.mouse_down) {
-						input_state.mouse_state = MOUSE_DRAG;
-					}
-					if (input_state.mouse_down_right) {
-						input_state.mouse_state_right = MOUSE_DRAG;
-					}
-					if (input_state.mouse_down_middle) {
-						input_state.mouse_state_middle = MOUSE_DRAG;
-					}
-				}
-			}
+        if (input_state->mouse_down || input_state->mouse_down_right || input_state->mouse_down_middle)
+        {
+            float dx = fabsf(input_state->drag_start.x - input_state->mouse_p.x);
+            float dy = fabsf(input_state->drag_start.y - input_state->mouse_p.y);
+            float drag_dx = fabsf((float)GetSystemMetrics(SM_CXDRAG) / (float)(r.right - r.left));
+            float drag_dy = fabsf((float)GetSystemMetrics(SM_CYDRAG) / (float)(r.top - r.bottom));
+            if (dx > drag_dx || dy > drag_dy) {
+                if (input_state->mouse_down) {
+                    input_state->mouse_state = MOUSE_DRAG;
+                }
+                if (input_state->mouse_down_right) {
+                    input_state->mouse_state_right = MOUSE_DRAG;
+                }
+                if (input_state->mouse_down_middle) {
+                    input_state->mouse_state_middle = MOUSE_DRAG;
+                }
+            }
+        }
 
-			if (input_state.mouse_state == MOUSE_DRAG && input_state.prev_mouse_state != MOUSE_DRAG)
-			{
-				RECT rcClient;                 // client area rectangle 
-				POINT ptClientUL;              // client upper left corner 
-				POINT ptClientLR;              // client lower right corner 
-				SetCapture(hWnd); 
-				GetClientRect(hWnd, &rcClient); 
-				ptClientUL.x = rcClient.left; 
-				ptClientUL.y = rcClient.top; 
-	 
-				// Add one to the right and bottom sides, because the 
-				// coordinates retrieved by GetClientRect do not 
-				// include the far left and lowermost pixels. 
-	 
-				ptClientLR.x = rcClient.right + 1; 
-				ptClientLR.y = rcClient.bottom + 1; 
-				ClientToScreen(hWnd, &ptClientUL); 
-				ClientToScreen(hWnd, &ptClientLR); 
-	 
-				SetRect(&rcClient, ptClientUL.x, ptClientUL.y, 
-					ptClientLR.x, ptClientLR.y); 
-				//ClipCursor(&rcClient); 
-			}
+        if (input_state->mouse_state == MOUSE_DRAG && input_state->prev_mouse_state != MOUSE_DRAG)
+        {
+            RECT rcClient;                 // client area rectangle 
+            POINT ptClientUL;              // client upper left corner 
+            POINT ptClientLR;              // client lower right corner 
+            SetCapture(window_data->hWnd); 
+            GetClientRect(window_data->hWnd, &rcClient); 
+            ptClientUL.x = rcClient.left; 
+            ptClientUL.y = rcClient.top; 
+ 
+            // Add one to the right and bottom sides, because the 
+            // coordinates retrieved by GetClientRect do not 
+            // include the far left and lowermost pixels. 
+ 
+            ptClientLR.x = rcClient.right + 1; 
+            ptClientLR.y = rcClient.bottom + 1; 
+            ClientToScreen(window_data->hWnd, &ptClientUL); 
+            ClientToScreen(window_data->hWnd, &ptClientLR); 
+ 
+            SetRect(&rcClient, ptClientUL.x, ptClientUL.y, 
+                ptClientLR.x, ptClientLR.y); 
+            //ClipCursor(&rcClient); 
+        }
 
-			float framebuffer_w = window_proc_params.framebuffer_w;
-			float framebuffer_h = window_proc_params.framebuffer_h;
-			float min_size =
-				(float)(framebuffer_w > framebuffer_h ? framebuffer_h : framebuffer_w);
-			float pad = fabsf((float)(framebuffer_w - framebuffer_h))*0.5f/min_size;
-			window_data->min_x = 0.f; window_data->max_x = 1.f;
-			window_data->min_y = 0.f; window_data->max_y = 1.f;
-			if(framebuffer_w > framebuffer_h){
-				window_data->min_x -= pad;
-				window_data->max_x += pad;
-			}else{
-				window_data->min_y -= pad;
-				window_data->max_y += pad;
-			}
-			window_data->framebuffer_w = framebuffer_w;
-			window_data->framebuffer_h = framebuffer_h;
+        float framebuffer_w = window_data->window_proc_params->framebuffer_w;
+        float framebuffer_h = window_data->window_proc_params->framebuffer_h;
+        float min_size =
+            (float)(framebuffer_w > framebuffer_h ? framebuffer_h : framebuffer_w);
+        float pad = fabsf((float)(framebuffer_w - framebuffer_h))*0.5f/min_size;
+        window_data->min_x = 0.f; window_data->max_x = 1.f;
+        window_data->min_y = 0.f; window_data->max_y = 1.f;
+        if(framebuffer_w > framebuffer_h){
+            window_data->min_x -= pad;
+            window_data->max_x += pad;
+        }else{
+            window_data->min_y -= pad;
+            window_data->max_y += pad;
+        }
+        window_data->framebuffer_w = framebuffer_w;
+        window_data->framebuffer_h = framebuffer_h;
 
-			LARGE_INTEGER current_tick, delta_ticks;
-			QueryPerformanceCounter(&current_tick);
-			delta_ticks.QuadPart = current_tick.QuadPart - last_tick.QuadPart;
-			last_tick = current_tick;
-			delta_ticks.QuadPart *= TICKS_PER_SECOND;
-			delta_ticks.QuadPart /= counter_frequency.QuadPart;
-			wait_for_event = update((int)delta_ticks.QuadPart, input_state, game_data);
-			render(framebuffer_w, framebuffer_h, game_data);
-			glFlush();
-			SwapBuffers(hDC);
-			input_state.prev_mouse_state = input_state.mouse_state;
-			if (input_state.mouse_state == MOUSE_CLICKED) {
-				input_state.mouse_state = MOUSE_NOTHING;
-			}
-			input_state.prev_mouse_state_right = input_state.mouse_state_right;
-			if (input_state.mouse_state_right == MOUSE_CLICKED) {
-				input_state.mouse_state_right = MOUSE_NOTHING;
-			}
-			input_state.prev_mouse_state_middle = input_state.mouse_state_middle;
-			if (input_state.mouse_state_middle == MOUSE_CLICKED) {
-				input_state.mouse_state_middle = MOUSE_NOTHING;
-			}
-			input_state.num_keys_typed = 0;
-			input_state.scroll_delta.y = 0.f;
-		}
-	}
+        LARGE_INTEGER current_tick, delta_ticks;
+        QueryPerformanceCounter(&current_tick);
+        delta_ticks.QuadPart = current_tick.QuadPart - window_data->last_tick.QuadPart;
+        window_data->last_tick = current_tick;
+        delta_ticks.QuadPart *= TICKS_PER_SECOND;
+        delta_ticks.QuadPart /= window_data->counter_frequency.QuadPart;
+        window_data->wait_for_event = update((int)delta_ticks.QuadPart, *input_state, game_data);
+        render(framebuffer_w, framebuffer_h, game_data);
+        glFlush();
+        SwapBuffers(window_data->hDC);
+        input_state->prev_mouse_state = input_state->mouse_state;
+        if (input_state->mouse_state == MOUSE_CLICKED) {
+            input_state->mouse_state = MOUSE_NOTHING;
+        }
+        input_state->prev_mouse_state_right = input_state->mouse_state_right;
+        if (input_state->mouse_state_right == MOUSE_CLICKED) {
+            input_state->mouse_state_right = MOUSE_NOTHING;
+        }
+        input_state->prev_mouse_state_middle = input_state->mouse_state_middle;
+        if (input_state->mouse_state_middle == MOUSE_CLICKED) {
+            input_state->mouse_state_middle = MOUSE_NOTHING;
+        }
+        input_state->num_keys_typed = 0;
+        input_state->scroll_delta.y = 0.f;
+    }
+	return window_data->window_proc_params->should_quit;
+}
 
+void window_end_game(struct GameData *game_data)
+{
 	end_game(game_data);
-
-	CloseHandle(timer);
-
+	struct WindowData* window_data = get_window_data(game_data);
+	CloseHandle(window_data->timer);
 	wglMakeCurrent(NULL, NULL);
-	ReleaseDC(hWnd, hDC);
-	wglDeleteContext(hRC);
-	DestroyWindow(hWnd);
+	ReleaseDC(window_data->hWnd, window_data->hDC);
+	wglDeleteContext(window_data->hRC);
+	DestroyWindow(window_data->hWnd);
 }
 
 struct OSData *window_get_os_data(struct WindowData *window)

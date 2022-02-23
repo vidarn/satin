@@ -1,8 +1,6 @@
 #include "../opengl.h"
 #define OPENGL_FUNC(type, name) type name;
 #include "../opengl_funcs.h"
-OPENGL_FUNC(PFNWGLCREATECONTEXTATTRIBSARBPROC, wglCreateContextAttribsARB)
-OPENGL_FUNC(PFNGLACTIVETEXTUREPROC, glActiveTexture)
 #undef OPENGL_FUNC
 
 static void *get_gl_func_pointer(const char *name, HMODULE opengl32_dll)
@@ -16,14 +14,27 @@ static void *get_gl_func_pointer(const char *name, HMODULE opengl32_dll)
 	return p;
 }
 
-void opengl_load(void)
+struct OpenGLFuncPointers {
+	#define OPENGL_FUNC(type, name) type name;
+	#include "../opengl_funcs.h"
+	#undef OPENGL_FUNC
+};
+
+void opengl_activate(struct OpenGLFuncPointers *ptrs) {
+	#define OPENGL_FUNC(type, name) name = ptrs->name;
+	#include "../opengl_funcs.h"
+    #undef OPENGL_FUNC
+}
+
+struct OpenGLFuncPointers *opengl_load(void)
 {
 	HMODULE opengl32_dll = LoadLibraryA("opengl32.dll");
+	struct OpenGLFuncPointers* ptrs = calloc(1, sizeof(struct OpenGLFuncPointers));
 
-	#define OPENGL_FUNC(type, name) name = get_gl_func_pointer(#name, opengl32_dll);
+	#define OPENGL_FUNC(type, name) ptrs->name = get_gl_func_pointer(#name, opengl32_dll);
 	#include "../opengl_funcs.h"
-	OPENGL_FUNC(PFNWGLCREATECONTEXTATTRIBSARBPROC, wglCreateContextAttribsARB)
-	OPENGL_FUNC(PFNGLACTIVETEXTUREPROC, glActiveTexture)
-	#undef OPENGL_FUNC
+    #undef OPENGL_FUNC
 
+    opengl_activate(ptrs);
+	return ptrs;
 }

@@ -21,15 +21,15 @@
 
 #define OPENGL_FUNC(type, name) extern type name;
 #include "opengl_funcs.h"
-#ifdef _WIN32
-OPENGL_FUNC(PFNWGLCREATECONTEXTATTRIBSARBPROC, wglCreateContextAttribsARB)
-OPENGL_FUNC(PFNGLACTIVETEXTUREPROC, glActiveTexture)
-#endif
 #undef OPENGL_FUNC
 #endif
 
 #endif
 
-void opengl_load(void)
+struct OpenGLFuncPointers
+;
+struct OpenGLFuncPointers* opengl_load(void)
+;
+void opengl_activate(struct OpenGLFuncPointers *ptrs)
 ;
 

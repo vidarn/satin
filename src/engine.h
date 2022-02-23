@@ -10,7 +10,10 @@ struct FrameData;
 struct WindowData;
 struct OSData;
 
-struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode);
+struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode)
+;
+void reinit_game_states(int num_game_state_types, struct GameState* game_state_types, struct GameData* data)
+;
 int update(int ticks, struct InputState input_state, struct GameData *data);
 void render(int framebuffer_w, int framebuffer_h, struct GameData *data);
 void end_game(struct GameData *data);

@@ -146,6 +146,7 @@ void render_quad(int shader, struct Matrix3 m, struct GraphicsValueSpec *uniform
     num_uniforms++; //NOTE(Vidar): Reserve space for the transform matrix;
 	*(struct Matrix3*)&r->m = multiply_matrix3(m, context->camera_2d);
     r->num_uniforms = num_uniforms;
+    //TODO(Vidar):We should probably do something about the allocations, they are slow
     //TODO(Vidar):Perhaps use a fixed size buffer to avoid this allocation
     r->uniforms = calloc(num_uniforms*sizeof(struct GraphicsValueSpec),1);
     r->shader = shader;
@@ -433,9 +434,7 @@ struct RenderRect rectintersect(struct RenderRect a, struct RenderRect b)
 {
     struct RenderCoord p1 = rectmax(rect(rectmin(a), rectmin(b)));
     struct RenderCoord p2 = rectmin(rect(rectmax(a), rectmax(b)));
-    //TODO: What about when there's no intersection??
-    //Handle the case of no intersection
-    if (p1.x > p2.x || p1.y > p2.y) {
+    if (p1.x > p2.x || p1.y > p2.y) { //Handle the case of no intersection
         return rect(czero, czero);
     }
     return rect(p1, p2);
@@ -619,9 +618,17 @@ struct Matrix4 get_rect_matrix4(struct RenderRect rect, float z, struct RenderCo
     float rh = ry1 - ry0;
     float resx, resy;
     window_get_res(&resx, &resy, get_window_data(context->data));
+    float sx = 1.f;
+    float sy = 1.f;
+    if (resx > resy) {
+        sx = resx / resy;
+    }
+    else {
+        sy = resy / resx;
+    }
     return multiply_matrix4(
-        get_scale_matrix4_non_uniform(rw*2.f/resx, rh*2.f/resy, 1.f),
-        get_translation_matrix4(-1.f + 2.f*rx0/resx, -1.f + 2.f*ry0/resy, z)
+        get_scale_matrix4_non_uniform(sx * rw*2.f/resx, sy * rh*2.f/resy, 1.f),
+        get_translation_matrix4(sx * (-1.f + 2.f*rx0/resx), sy * (-1.f + 2.f*ry0/resy), z)
     );
 }
 
@@ -1993,6 +2000,8 @@ void frame_data_reset(struct FrameData *frame_data)
         while(list != 0){
             for(int i=0;i<list->num;i++){
                 struct RenderQuad *r = list->quads + i;
+                //TODO: This is quite slow (at least in debug mode).
+                // Can we be smarter, and avoid the loop somehow?
                 //NOTE(Vidar):The first uniform is the transform matrix, don't
                 // try to free it!
                 for(int j=1;j<r->num_uniforms;j++){
@@ -2154,7 +2163,6 @@ float sum_values(float *values, int num)
     return sum;
 }
 
-
 struct GameData *init(int num_game_states, struct GameState *game_states, void *param, struct WindowData *window_data, int debug_mode)
 {
     struct GameData *data = calloc(1,sizeof(struct GameData));
@@ -2220,6 +2228,28 @@ struct GameData *init(int num_game_states, struct GameState *game_states, void *
 
     return data;
 }
+
+void reinit_game_states(int num_game_state_types, struct GameState* game_state_types, struct GameData *data)
+{
+    struct GameState *new_game_state_types = calloc(num_game_state_types,sizeof(struct GameState));
+	memcpy(new_game_state_types, game_state_types, num_game_state_types * sizeof(struct GameState));
+
+    for (int i = 0; i < data->num_game_states; i++) {
+        struct GameState* state= data->game_states + i;
+        for (int j = 0; j < data->num_game_state_types; j++) {
+            if (state->update == data->game_state_types[j].update) {
+                void* custom_tmp = state->custom_data;
+                *state = new_game_state_types[j];
+                state->custom_data = custom_tmp;
+                break;
+            }
+        }
+    }
+    free(data->game_state_types);
+    data->num_game_state_types = num_game_state_types;
+    data->game_state_types = new_game_state_types;
+}
+
 
 struct Color rgb(float r, float g, float b)
 {
