@@ -179,6 +179,11 @@ CreateOpenGLWindow(const char* title, int x, int y, struct WindowProcParams *win
 
 	ReleaseDC(hWnd, hDC);
 
+    int dpi = GetDpiForWindow(hWnd);
+    int w = (window_proc_params->framebuffer_w * dpi)/96;
+    int h = (window_proc_params->framebuffer_h * dpi)/96;
+    SetWindowPos(hWnd, 0, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER);
+
 	return hWnd;
 }
 
@@ -614,4 +619,9 @@ void window_get_res(float* w, float* h, struct WindowData* window)
 int window_is_key_down(int key)
 {
 	return 0;
+}
+
+int window_get_dpi(struct WindowData *window)
+{
+    return GetDpiForWindow(window->hWnd);
 }

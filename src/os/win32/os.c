@@ -197,10 +197,10 @@ char *get_cwd()
 	return ret;
 }
 
-int os_list_entries_in_folder(const char *path, const char **entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type)
+int os_list_entries_in_folder(const char* path, char** entries, int max_num_entries, int entry_offset, enum OS_LIST_ENTRIES_TYPE type)
 {
 	int num_entries = 0;
-	char *buffer = calloc(strlen(path) + 8, 1);
+	char* buffer = calloc(strlen(path) + 8, 1);
 	sprintf(buffer, "%s/*.*", path);
 	WIN32_FIND_DATA fd;
 	HANDLE hFind = FindFirstFile(buffer, &fd);
@@ -208,12 +208,16 @@ int os_list_entries_in_folder(const char *path, const char **entries, int max_nu
 		do {
 			if (
 				(!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || type & OS_LIST_ENTRIES_TYPE_FOLDER) &&
-				( (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || type & OS_LIST_ENTRIES_TYPE_FILE))
+				((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || type & OS_LIST_ENTRIES_TYPE_FILE))
 			{
-				entries[num_entries] = strdup(fd.cFileName);
-				num_entries++;
-				if (num_entries == max_num_entries) {
-					break;
+				if (entry_offset > 0) {
+					entry_offset--;
+				} else {
+					entries[num_entries] = strdup(fd.cFileName);
+					num_entries++;
+					if (num_entries == max_num_entries) {
+						break;
+					}
 				}
 			}
 		} while (FindNextFile(hFind, &fd));
@@ -223,14 +227,14 @@ int os_list_entries_in_folder(const char *path, const char **entries, int max_nu
 	return num_entries;
 }
 
-int os_list_resource_entries(const char *data_path, const char** entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type, struct OSData *os_data)
+int os_list_resource_entries(const char *data_path, char** entries, int max_num_entries, enum OS_LIST_ENTRIES_TYPE type, struct OSData *os_data)
 {
 	size_t os_data_path_len = wcstombs(0,os_data->data_base_path,0);
 	size_t len = os_data_path_len + strlen(data_path) + 1;
 	char* buffer = calloc(len, 1);
 	wcstombs(buffer, os_data->data_base_path, os_data_path_len);
 	strcpy(buffer + os_data_path_len, data_path);
-	int ret = os_list_entries_in_folder(buffer, entries, max_num_entries, type);
+	int ret = os_list_entries_in_folder(buffer, entries, max_num_entries, 0, type);
 	free(buffer);
 	return ret;
 }

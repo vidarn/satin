@@ -42,3 +42,5 @@ void window_get_res(float *w, float *h, struct WindowData *window)
 ;
 int window_is_key_down(int key)
 ;
+int window_get_dpi(struct WindowData *window)
+;
