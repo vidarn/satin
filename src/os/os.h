@@ -53,3 +53,8 @@ int os_does_folder_exist(const char *path)
 ;
 int os_make_folder(const char* path)
 ;
+
+void window_set_left_deadzone_amount(float amnt)
+;
+void window_set_right_deadzone_amount(float amnt)
+;

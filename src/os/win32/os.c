@@ -381,6 +381,15 @@ void win32_set_icon(void *os_data, HICON icon)
 float controller_left_thumb_deadzone = (float)XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE/32768.f;
 float controller_right_thumb_deadzone = (float)XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE/32768.f;
 
+void window_set_left_deadzone_amount(float amnt)
+{
+    controller_left_thumb_deadzone = amnt * (float)XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE / 32768.f;
+}
+void window_set_right_deadzone_amount(float amnt)
+{
+    controller_right_thumb_deadzone = amnt * (float)XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE / 32768.f;
+}
+
 void launch_game(const char *window_title, int _framebuffer_w, int _framebuffer_h, int show_console, 
 	int num_game_states, void *param, struct GameState *game_states, int debug_mode, void *os_data)
 {

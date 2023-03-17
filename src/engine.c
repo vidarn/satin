@@ -809,7 +809,7 @@ void update_mesh_from_memory(int mesh_index, int num_verts, struct Vec3 *pos_dat
     if(uv_data){
         int uv_map_loc=glGetAttribLocation(mesh.shader->shader,"uv_map");
         if(uv_map_loc == -1){
-            printf("Error: Could not find \"uv_map\" attribute in shader\n");
+            //printf("Error: Could not find \"uv_map\" attribute in shader\n");
         }
         glEnableVertexAttribArray(uv_map_loc);
         glVertexAttribPointer(uv_map_loc,2,GL_FLOAT,GL_FALSE,
